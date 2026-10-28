@@ -1,5 +1,5 @@
 /**
- * LocationSelectScene — выбор начальной локации.
+ * LocationSelectScene — выбор параметров старта и передача в GameState.
  */
 import gameState from '../systems/GameState.js';
 import BALANCE from '../config/balance.js';
@@ -11,16 +11,16 @@ export default class LocationSelectScene extends Phaser.Scene {
   }
 
   create() {
-    this.cameras.main.setBackgroundColor('#1a1a2e');
+    this.cameras.main.setBackgroundColor('#0b0e14');
 
     showLocationSelect({
       locations: BALANCE.locations,
       startupCosts: BALANCE.startupCosts,
       totalStartupCost: BALANCE.totalStartupCost,
       startingCapital: BALANCE.startingCapital,
-      onSelect: (locationId) => {
+      onSelect: (locationId, customConfig) => {
         hideLocationSelect();
-        gameState.initNewGame(locationId);
+        gameState.initNewGame(locationId, customConfig);
         this.scene.start('CarWashScene');
       },
     });

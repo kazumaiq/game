@@ -1,18 +1,18 @@
 /**
  * Единая конфигурация игрового баланса.
- * Все цены, ставки и параметры — в одном месте.
+ * Все цены, ставки, опции оборудования, документы и проверки — в одном месте.
  */
 
 export const BALANCE = {
   // Стартовый капитал
   startingCapital: 6_000_000,
 
-  // Расходы на запуск (фиксированные)
+  // Базовые расходы на запуск (по умолчанию при классическом сценарии)
   startupCosts: {
     deposit: 300_000,       // Залог и первый месяц аренды
     permits: 250_000,       // Документы и разрешения
     construction: 2_100_000,// Подготовка территории
-    equipment: 1_650_000,   // Два комплекта б/у оборудования
+    equipment: 1_650_000,   // Комплект б/у оборудования
     utilities: 500_000,     // Подключения и монтаж
     supplies: 200_000,      // Начальные расходные материалы
     signage: 400_000,       // Вывеска и открытие
@@ -26,6 +26,73 @@ export const BALANCE = {
     return this.startingCapital - this.totalStartupCost;
   },
 
+  // Опции оборудования при старте
+  equipmentOptions: {
+    used: {
+      id: 'used',
+      name: 'Комплект б/у оборудования',
+      cost: 1_650_000,
+      breakChanceMult: 1.0,
+      qualityMult: 1.0,
+      description: 'Доступный вариант, умеренный шанс поломок.',
+    },
+    newStandard: {
+      id: 'newStandard',
+      name: 'Новое оборудование Kärcher',
+      cost: 2_400_000,
+      breakChanceMult: 0.5,
+      qualityMult: 1.25,
+      description: 'Высокая надежность и повышенное качество мойки.',
+    },
+    premiumAuto: {
+      id: 'premiumAuto',
+      name: 'Премиум-комплекс с дозатором химии',
+      cost: 3_200_000,
+      breakChanceMult: 0.3,
+      qualityMult: 1.5,
+      description: 'Максимальная скорость, идеальная пена, редкие поломки.',
+    },
+  },
+
+  // Документы и разрешительная система
+  documents: {
+    ses: {
+      id: 'ses',
+      name: 'Заключение СЭС (санитарный надзор)',
+      cost: 60_000,
+      fine: 120_000,
+      description: 'Требуется для законной работы и безопасной утилизации стоков.',
+    },
+    fire: {
+      id: 'fire',
+      name: 'Пожарный аудит и разрешение МЧС',
+      cost: 70_000,
+      fine: 150_000,
+      description: 'Проверка электропроводки, насосов и огнетушителей.',
+    },
+    ecology: {
+      id: 'ecology',
+      name: 'Экологический паспорт и очистные',
+      cost: 80_000,
+      fine: 200_000,
+      description: 'Нормативы сброса фильтрованной воды в канализацию.',
+    },
+    vodokanal: {
+      id: 'vodokanal',
+      name: 'Договор с Водоканалом и опломбировка',
+      cost: 40_000,
+      fine: 90_000,
+      description: 'Официальный учет расхода и давления воды.',
+    },
+  },
+
+  // Проверки (инспекции)
+  inspections: [
+    { day: 3, type: 'ses', name: 'Плановый рейд СЭС' },
+    { day: 7, type: 'fire', name: 'Инспекция пожарной безопасности' },
+    { day: 12, type: 'ecology', name: 'Экологический контроль стоков' },
+  ],
+
   // Локации
   locations: {
     roadside: {
@@ -33,10 +100,10 @@ export const BALANCE = {
       name: 'Придорожная территория',
       monthlyRent: 150_000,
       get dailyRent() { return Math.round(this.monthlyRent / 30); },
-      customerFlow: 1.0,        // множитель базового потока
-      repeatBonus: 0.0,         // бонус к повторным
-      avgCheckMultiplier: 1.0,  // множитель среднего чека
-      competitionPressure: 0.8, // давление конкуренции
+      customerFlow: 1.0,
+      repeatBonus: 0.0,
+      avgCheckMultiplier: 1.0,
+      competitionPressure: 0.8,
       description: 'Высокий поток случайных клиентов. Умеренные риски.',
     },
     residential: {
@@ -78,7 +145,7 @@ export const BALANCE = {
         rinse: 'Смывание',
         finish: 'Финишная обработка',
       },
-      baseDuration: 3000, // мс на этап (базовая)
+      baseDuration: 3000,
     },
   },
 
@@ -124,27 +191,27 @@ export const BALANCE = {
 
   // Клиенты
   customer: {
-    basePatience: 30000,       // мс ожидания в очереди
-    patienceVariance: 10000,   // ± мс
-    spawnIntervalBase: 8000,   // мс между клиентами
+    basePatience: 30000,
+    patienceVariance: 10000,
+    spawnIntervalBase: 8000,
     spawnIntervalVariance: 4000,
     maxQueueSize: 6,
     maxActiveCars: 8,
-    repeatVisitBase: 0.2,      // базовый шанс повторного визита
+    repeatVisitBase: 0.2,
   },
 
   // Сотрудники
   employee: {
     hireCost: 0,
     dailySalary: 3000,
-    baseSpeed: 0.7,    // скорость относительно игрока (1.0)
-    baseQuality: 0.75, // качество относительно игрока
+    baseSpeed: 0.7,
+    baseQuality: 0.75,
     maxEmployees: 4,
   },
 
-  // Ежедневные расходы
+  // Ежедневные коммунальные
   dailyCosts: {
-    utilities: 1500, // коммунальные за смену
+    utilities: 1500,
   },
 
   // Улучшения
@@ -155,7 +222,7 @@ export const BALANCE = {
       description: 'Уменьшает время каждого этапа мойки',
       maxLevel: 5,
       prices: [50_000, 100_000, 200_000, 400_000, 800_000],
-      effects: [0.9, 0.8, 0.7, 0.6, 0.5], // множитель времени
+      effects: [0.9, 0.8, 0.7, 0.6, 0.5],
     },
     equipmentQuality: {
       id: 'equipmentQuality',
@@ -163,7 +230,7 @@ export const BALANCE = {
       description: 'Повышает базовое качество обслуживания',
       maxLevel: 5,
       prices: [80_000, 160_000, 320_000, 640_000, 1_200_000],
-      effects: [1.1, 1.2, 1.3, 1.4, 1.5], // множитель качества
+      effects: [1.1, 1.2, 1.3, 1.4, 1.5],
     },
     reliability: {
       id: 'reliability',
@@ -171,7 +238,7 @@ export const BALANCE = {
       description: 'Снижает вероятность поломок',
       maxLevel: 5,
       prices: [60_000, 120_000, 240_000, 480_000, 960_000],
-      effects: [0.8, 0.6, 0.45, 0.3, 0.15], // множитель шанса поломки
+      effects: [0.8, 0.6, 0.45, 0.3, 0.15],
     },
     capacity: {
       id: 'capacity',
@@ -179,7 +246,7 @@ export const BALANCE = {
       description: 'Увеличивает максимум машин в очереди',
       maxLevel: 3,
       prices: [150_000, 300_000, 600_000],
-      effects: [8, 10, 12], // новый макс. очереди
+      effects: [8, 10, 12],
     },
     supplyEfficiency: {
       id: 'supplyEfficiency',
@@ -187,28 +254,28 @@ export const BALANCE = {
       description: 'Снижает расход материалов на мойку',
       maxLevel: 5,
       prices: [40_000, 80_000, 160_000, 320_000, 640_000],
-      effects: [0.9, 0.8, 0.7, 0.6, 0.5], // множитель расхода
+      effects: [0.9, 0.8, 0.7, 0.6, 0.5],
     },
   },
 
   // Поломки
   breakdown: {
-    baseChancePerWash: 0.03,  // 3% за мойку при базовом уровне
+    baseChancePerWash: 0.03,
     repairCostBase: 15_000,
-    repairTime: 5000, // мс на ремонт
+    repairTime: 5000,
   },
 
   // Маркетинг
   marketing: {
     campaignCost: 30_000,
-    campaignDuration: 3,        // дней
-    customerFlowBoost: 1.5,     // множитель потока
+    campaignDuration: 3,
+    customerFlowBoost: 1.5,
   },
 
   // Программа лояльности
   loyalty: {
     setupCost: 20_000,
-    repeatBoost: 0.15,          // прибавка к шансу повторного визита
+    repeatBoost: 0.15,
   },
 
   // Конкурент
@@ -218,7 +285,7 @@ export const BALANCE = {
     priceWarPrice: 100,
     buyoutOfferDay: 8,
     buyoutPrice: 1_200_000,
-    demandReductionDuringWar: 0.4, // сколько спроса забирает конкурент
+    demandReductionDuringWar: 0.4,
   },
 
   // Репутация
@@ -234,7 +301,7 @@ export const BALANCE = {
 
   // Время
   time: {
-    shiftDurationMs: 180_000,   // 3 мин реального времени = 1 рабочий день
+    shiftDurationMs: 180_000,
     dayStartHour: 8,
     dayEndHour: 20,
   },

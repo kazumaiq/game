@@ -1,6 +1,8 @@
 /**
- * CarWashScene — оптимизированная сцена с правильным полезным масштабом камеры,
- * четким фокусом на персонаже, информативной кнопкой действия и подсказками расстояния.
+ * CarWashScene — оптимизированная сцена с гарантированной целевой машиной в боксе 1
+ * на старте новой игры, интерактивной неоновой рамкой подсветки цели,
+ * depth-сортировкой (пол < машина < навес бокса < персонаж), проверками инспекций
+ * и полноценным Fullscreen.
  */
 import gameState from '../systems/GameState.js';
 import BALANCE from '../config/balance.js';
@@ -11,25 +13,19 @@ import { showToast } from '../../ui/ToastUI.js';
 import { StorySystem } from '../systems/StorySystem.js';
 import { TutorialSystem } from '../systems/TutorialSystem.js';
 
-// Пропорциональная компактная площадка (мир оптимизирован под мобильные и десктоп)
 const WORLD = {
   width: 900,
   height: 640,
-  // Административное здание
   building: { x: 450, y: 105 },
-  // 2 моечных бокса
   posts: [
     { x: 300, y: 310, label: 'Бокс 1' },
     { x: 600, y: 310, label: 'Бокс 2' },
   ],
-  // Зона ожидания клиентов
   queueStart: { x: 130, y: 490 },
   queueSpacing: 70,
-  // Въезд и выезд
   entrance: { x: 40, y: 575 },
   exit: { x: 860, y: 575 },
   roadY: 585,
-  // Стартовая позиция игрока
   playerStart: { x: 450, y: 390 },
 };
 
@@ -56,13 +52,19 @@ export default class CarWashScene extends Phaser.Scene {
     this._walkAnimTimer = 0;
     this._walkFrame = 0;
 
+    // Графический маркер подсветки целевой машины во время обучения
+    this._targetHighlight = this.add.graphics();
+    this._targetHighlight.setDepth(11);
+
     this._storySystem = new StorySystem();
     this._tutorialSystem = new TutorialSystem();
 
     createHUD(this);
     saveSystem.startAutoSave();
 
-    this._spawnTimer = BALANCE.customer.spawnIntervalBase * 0.2;
+    // Если это новая игра и посты пусты — сразу ставим первую машину в Бокс 1!
+    this._ensureInitialCar();
+
     this._storySystem.checkEvents(this);
 
     if (!gameState.tutorialCompleted) {
@@ -78,11 +80,25 @@ export default class CarWashScene extends Phaser.Scene {
     updateHUD();
   }
 
+  /** Гарантированное размещение первой обучающей машины в боксе 1 */
+  _ensureInitialCar() {
+    const post1 = gameState.posts[0];
+    if (!post1.busy && gameState.cars.length === 0) {
+      const car = gameState.addCar('sedan');
+      if (car) {
+        gameState.assignCarToPost(car.id, post1.id);
+        const pos = WORLD.posts[0];
+        const sprite = this.add.image(pos.x, pos.y + 12, 'car_sedan_dirty');
+        sprite.setDepth(10);
+        this._carSprites[car.id] = sprite;
+      }
+    }
+  }
+
   _handleResize(gameSize) {
     const width = gameSize.width;
     const height = gameSize.height;
 
-    // Оптимальный зум камеры: вблизи объекты четкие и крупные
     const minDim = Math.min(width, height);
     let targetZoom = 1.25;
     if (minDim < 420) {
@@ -95,14 +111,12 @@ export default class CarWashScene extends Phaser.Scene {
   }
 
   _createEnvironment() {
-    // 1. Газон вокруг
     for (let x = 0; x < WORLD.width; x += 64) {
       for (let y = 0; y < WORLD.height; y += 64) {
         this.add.image(x + 32, y + 32, 'lawn_tile').setDepth(0);
       }
     }
 
-    // 2. Асфальтированная площадка автомойки
     const yardW = 820;
     const yardH = 470;
     const yardX = WORLD.width / 2;
@@ -114,7 +128,6 @@ export default class CarWashScene extends Phaser.Scene {
     const yard = this.add.tileSprite(yardX, yardY, yardW, yardH, 'asphalt_ground');
     yard.setDepth(2);
 
-    // 3. Дорожная полоса снизу
     const road = this.add.tileSprite(WORLD.width / 2, WORLD.roadY, WORLD.width, 80, 'road_strip');
     road.setDepth(3);
 
@@ -132,11 +145,10 @@ export default class CarWashScene extends Phaser.Scene {
       fontFamily: 'sans-serif',
     }).setOrigin(1, 0).setDepth(4);
 
-    // 4. Административное здание
     this._building = this.add.image(WORLD.building.x, WORLD.building.y, 'building_complex');
-    this._building.setDepth(8);
+    this._building.setDepth(7);
 
-    // 5. Боксы мойки
+    // Моечные боксы (пол имеет depth: 5, крыша и стойки поверх пола)
     this._postSprites = [];
     for (let i = 0; i < WORLD.posts.length; i++) {
       const pos = WORLD.posts[i];
@@ -152,12 +164,11 @@ export default class CarWashScene extends Phaser.Scene {
         padding: { x: 8, y: 3 },
         fontFamily: 'sans-serif',
         fontStyle: 'bold',
-      }).setOrigin(0.5).setDepth(7);
+      }).setOrigin(0.5).setDepth(8);
 
       this._postSprites.push(sprite);
     }
 
-    // 6. Декорации
     this.add.image(180, 180, 'potted_tree').setDepth(7);
     this.add.image(720, 180, 'potted_tree').setDepth(7);
     this.add.image(30, 260, 'lamp_post').setDepth(7);
@@ -311,7 +322,6 @@ export default class CarWashScene extends Phaser.Scene {
       return;
     }
 
-    // Проверяем близость к сломанному боксу
     for (let i = 0; i < gameState.posts.length; i++) {
       const post = gameState.posts[i];
       if (post.broken) {
@@ -325,7 +335,6 @@ export default class CarWashScene extends Phaser.Scene {
       }
     }
 
-    // Проверяем близость к машине в боксе
     for (let i = 0; i < gameState.posts.length; i++) {
       const post = gameState.posts[i];
       if (post.busy && post.carId) {
@@ -346,6 +355,29 @@ export default class CarWashScene extends Phaser.Scene {
     btnSub.textContent = 'ПОДОЙДИ БЛИЖЕ';
   }
 
+  /** Отрисовка маркера подсветки целевого автомобиля во время обучения */
+  _updateTargetHighlight() {
+    this._targetHighlight.clear();
+    if (gameState.tutorialCompleted) return;
+
+    const post1 = gameState.posts[0];
+    if (post1.busy && post1.carId) {
+      const carSprite = this._carSprites[post1.carId];
+      if (carSprite && carSprite.active) {
+        const time = this.time.now * 0.005;
+        const alpha = 0.5 + Math.sin(time) * 0.3;
+        this._targetHighlight.lineStyle(3, 0x00d2d3, alpha);
+        this._targetHighlight.strokeRoundedRect(
+          carSprite.x - carSprite.width / 2 - 4,
+          carSprite.y - carSprite.height / 2 - 4,
+          carSprite.width + 8,
+          carSprite.height + 8,
+          8
+        );
+      }
+    }
+  }
+
   _handleInteract() {
     if (gameState.paused || !gameState.shiftActive) return;
 
@@ -354,7 +386,7 @@ export default class CarWashScene extends Phaser.Scene {
       return;
     }
 
-    // Ремонт сломанного бокса
+    // Ремонт бокса
     for (let i = 0; i < gameState.posts.length; i++) {
       const post = gameState.posts[i];
       if (post.broken) {
@@ -374,7 +406,7 @@ export default class CarWashScene extends Phaser.Scene {
     }
 
     // Мойка машины
-    let nearestCarDistance = Infinity;
+    let nearestCarDist = Infinity;
     for (let i = 0; i < gameState.posts.length; i++) {
       const post = gameState.posts[i];
       if (post.busy && post.carId) {
@@ -383,7 +415,7 @@ export default class CarWashScene extends Phaser.Scene {
 
         const pos = WORLD.posts[i];
         const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, pos.x, pos.y);
-        if (dist < nearestCarDistance) nearestCarDistance = dist;
+        if (dist < nearestCarDist) nearestCarDist = dist;
 
         if (dist < 100) {
           this._startWashing(car.id);
@@ -392,10 +424,10 @@ export default class CarWashScene extends Phaser.Scene {
       }
     }
 
-    if (nearestCarDistance < 220) {
+    if (nearestCarDist < 240) {
       showToast('Подойди ближе к машине в боксе!', 'info');
     } else {
-      showToast('Нет машин поблизости. Дождись заезда клиента в бокс!', 'info');
+      showToast('Нет машин поблизости. Подожди заезда в бокс!', 'info');
     }
   }
 
@@ -586,7 +618,7 @@ export default class CarWashScene extends Phaser.Scene {
     this.tweens.add({
       targets: sprite,
       x: postPos.x,
-      y: postPos.y + 14,
+      y: postPos.y + 12,
       duration: 850,
       ease: 'Power2',
     });
@@ -782,6 +814,7 @@ export default class CarWashScene extends Phaser.Scene {
 
     this._updateDepth();
     this._updateActionBtnContext();
+    this._updateTargetHighlight();
 
     if (Math.floor(time / 250) !== Math.floor((time - delta) / 250)) {
       updateHUD();
@@ -835,11 +868,12 @@ export default class CarWashScene extends Phaser.Scene {
   }
 
   _updateDepth() {
-    this.player.setDepth(10 + this.player.y * 0.01);
+    this.player.setDepth(15 + this.player.y * 0.01);
     for (const carId of Object.keys(this._carSprites)) {
       const sprite = this._carSprites[carId];
       if (sprite && sprite.active) {
-        sprite.setDepth(9 + sprite.y * 0.01);
+        // Машина гарантированно поверх пола (6) и ниже игрока (15)
+        sprite.setDepth(10 + sprite.y * 0.01);
       }
     }
   }
@@ -882,15 +916,20 @@ export default class CarWashScene extends Phaser.Scene {
       post.carId = null;
     }
 
+    // Применение суточных расходов
     gameState.applyDailyExpenses();
+
+    // Проверка надзорных инспекций (СЭС, МЧС, Экология)
+    const inspResult = gameState.checkInspections();
+
     saveSystem.save();
     this._storySystem.checkEvents(this);
-    this._showDayReport();
+    this._showDayReport(inspResult);
 
     gameState.shiftEndProcessing = false;
   }
 
-  _showDayReport() {
+  _showDayReport(inspResult = null) {
     const overlay = document.getElementById('ui-overlay');
     const todayLogs = gameState.financialLog.filter(l => l.day === gameState.day);
     const income = todayLogs.filter(l => l.type === 'income').reduce((s, l) => s + l.amount, 0);
@@ -904,12 +943,30 @@ export default class CarWashScene extends Phaser.Scene {
       rows += `<tr class="${cls}"><td>${log.description}</td><td>${sign}${this._formatMoney(log.amount)}</td></tr>`;
     }
 
+    let inspectionNotice = '';
+    if (inspResult) {
+      if (inspResult.passed) {
+        inspectionNotice = `
+          <div style="background:rgba(34,197,94,0.12);border:1px solid #22c55e;border-radius:8px;padding:8px;margin:8px 0;font-size:12px;color:#86efac;">
+            ✓ <strong>${inspResult.insp.name}</strong> пройдена успешно! Репутация повышена (+5).
+          </div>
+        `;
+      } else {
+        inspectionNotice = `
+          <div style="background:rgba(239,68,68,0.15);border:1px solid #ef4444;border-radius:8px;padding:8px;margin:8px 0;font-size:12px;color:#fca5a5;">
+            ⚠️ <strong>${inspResult.insp.name}:</strong> Выявлено нарушение! Отсутствует ${inspResult.docDef.name}. Наложен штраф <strong>${this._formatMoney(inspResult.fine)}</strong>. Оформите документ в разделе «Бизнес».
+          </div>
+        `;
+      }
+    }
+
     const panel = document.createElement('div');
     panel.className = 'panel-overlay';
     panel.innerHTML = `
       <div class="panel">
         <button class="panel-close" id="report-close">✕</button>
         <h2>Итоги смены ${gameState.day}</h2>
+        ${inspectionNotice}
         <table class="finance-table">
           ${rows}
           <tr class="total">
@@ -917,7 +974,7 @@ export default class CarWashScene extends Phaser.Scene {
             <td style="color:${profit >= 0 ? '#22c55e' : '#ef4444'}">${profit >= 0 ? '+' : ''}${this._formatMoney(profit)}</td>
           </tr>
         </table>
-        <p style="margin-top:10px;color:#cbd5e1;font-size:12px;">Помыто: <strong>${gameState.stats.todayCarsWashed}</strong> машин</p>
+        <p style="margin-top:10px;color:#cbd5e1;font-size:12px;">Помыто: <strong>${gameState.stats.todayCarsWashed}</strong> авто</p>
         <p style="color:#cbd5e1;font-size:12px;">Баланс кассы: <strong style="color:#38bdf8">${this._formatMoney(gameState.money)}</strong></p>
         ${gameState.money < 0 ? '<p style="color:#ef4444;font-weight:bold;margin-top:6px;font-size:12px;">⚠ Баланс ушел в минус! Оптимизируйте расходы.</p>' : ''}
         <div style="text-align:center;margin-top:14px;">
@@ -962,6 +1019,10 @@ export default class CarWashScene extends Phaser.Scene {
     gameState.off('stateChanged', this._onStateChanged);
     destroyHUD();
     hideWashProgress();
+
+    if (this._targetHighlight) {
+      this._targetHighlight.destroy();
+    }
 
     if (this._touchControlsRoot) {
       this._touchControlsRoot.remove();

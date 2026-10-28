@@ -1,6 +1,7 @@
 /**
  * GameState — единый источник истины для всех игровых данных.
- * Ни UI, ни Phaser не изменяют данные напрямую — только через методы GameState.
+ * Поддерживает кастомную смету запуска, систему документов (СЭС, МЧС, Экология, Водоканал),
+ * проверки с санкциями, запасы расходных материалов.
  */
 import BALANCE from '../config/balance.js';
 
@@ -24,7 +25,19 @@ class GameState {
 
     this.money = 0;
     this.location = null;
+    this.equipmentType = 'used'; // 'used', 'newStandard', 'premiumAuto'
     this.reputation = BALANCE.reputation.initial;
+
+    // Оформленные документы
+    this.documents = {
+      ses: false,
+      fire: false,
+      ecology: false,
+      vodokanal: false,
+    };
+
+    // Запасы автохимии (число моек)
+    this.suppliesStock = 50;
 
     this.upgrades = {};
     for (const key of Object.keys(BALANCE.upgrades)) {
@@ -70,20 +83,51 @@ class GameState {
       sfxVolume: 0.7,
     };
 
-    this.saveVersion = 3;
+    this.saveVersion = 4;
     this.shiftEndProcessing = false;
   }
 
-  /** Инициализация новой игры */
-  initNewGame(locationId) {
+  /**
+   * Инициализация новой игры с выбором локации, оборудования и опциональных документов
+   */
+  initNewGame(locationId, customConfig = null) {
     this.reset();
     this.location = locationId;
     this.money = BALANCE.startingCapital;
 
-    // Списать стартовые расходы ОДИН раз
-    const startupTotal = BALANCE.totalStartupCost;
+    let startupTotal = 0;
+    let equipCost = BALANCE.startupCosts.equipment;
+
+    if (customConfig && customConfig.equipment) {
+      this.equipmentType = customConfig.equipment;
+      const opt = BALANCE.equipmentOptions[customConfig.equipment];
+      if (opt) equipCost = opt.cost;
+    }
+
+    // Базовые расходы за вычетом оборудования
+    const baseFixed = BALANCE.startupCosts.deposit +
+      BALANCE.startupCosts.permits +
+      BALANCE.startupCosts.construction +
+      BALANCE.startupCosts.utilities +
+      BALANCE.startupCosts.supplies +
+      BALANCE.startupCosts.signage;
+
+    startupTotal = baseFixed + equipCost;
+
+    // Оформление стартовых документов, если выбрано в мастере
+    if (customConfig && customConfig.docs) {
+      for (const [docId, selected] of Object.entries(customConfig.docs)) {
+        if (selected && BALANCE.documents[docId]) {
+          this.documents[docId] = true;
+          startupTotal += BALANCE.documents[docId].cost;
+          this._logFinance('expense', `Лицензия: ${BALANCE.documents[docId].name}`, BALANCE.documents[docId].cost);
+        }
+      }
+    }
+
     this.money -= startupTotal;
-    this._logFinance('expense', 'Расходы на запуск', startupTotal);
+    this._logFinance('expense', 'Подготовка и открытие автомойки', startupTotal);
+
     this.initialized = true;
     this.day = 1;
     this.shiftActive = true;
@@ -94,6 +138,35 @@ class GameState {
   /** Получить параметры текущей локации */
   getLocation() {
     return this.location ? BALANCE.locations[this.location] : null;
+  }
+
+  /** Покупка/оформление документа */
+  buyDocument(docId) {
+    const docDef = BALANCE.documents[docId];
+    if (!docDef) return { success: false, reason: 'Неизвестный документ' };
+    if (this.documents[docId]) return { success: false, reason: 'Документ уже оформлен' };
+    if (this.money < docDef.cost) return { success: false, reason: 'Недостаточно средств' };
+
+    this.money -= docDef.cost;
+    this.documents[docId] = true;
+    this.stats.totalExpenses += docDef.cost;
+    this.stats.todayExpenses += docDef.cost;
+    this._logFinance('expense', `Оформление: ${docDef.name}`, docDef.cost);
+    this.emit('stateChanged');
+    return { success: true, doc: docDef };
+  }
+
+  /** Закупка автохимии (партия на 50 моек) */
+  buySuppliesStock() {
+    const cost = 25_000;
+    if (this.money < cost) return { success: false, reason: 'Недостаточно средств' };
+    this.money -= cost;
+    this.suppliesStock += 50;
+    this.stats.totalExpenses += cost;
+    this.stats.todayExpenses += cost;
+    this._logFinance('expense', 'Закупка автохимии (50 комплектов)', cost);
+    this.emit('stateChanged');
+    return { success: true, newStock: this.suppliesStock };
   }
 
   /** Доход за оказанную услугу */
@@ -111,6 +184,10 @@ class GameState {
     this.money += price;
     this.money -= supplyCost;
 
+    if (this.suppliesStock > 0) {
+      this.suppliesStock--;
+    }
+
     car.paid = true;
     car.completed = true;
 
@@ -124,8 +201,7 @@ class GameState {
     this._logFinance('income', `Мойка ${carClass.name}`, price);
     this._logFinance('expense', `Материалы (${carClass.name})`, supplyCost);
 
-    // Репутация
-    if (quality >= 0.9) {
+    if (quality >= 0.85) {
       this.changeReputation(BALANCE.reputation.goodServiceBonus);
     } else if (quality < 0.5) {
       this.changeReputation(BALANCE.reputation.poorServicePenalty);
@@ -138,7 +214,7 @@ class GameState {
   /** Ежедневные расходы (конец смены) */
   applyDailyExpenses() {
     const loc = this.getLocation();
-    if (!loc) return;
+    if (!loc) return 0;
 
     const rent = loc.dailyRent;
     const utilities = BALANCE.dailyCosts.utilities;
@@ -153,14 +229,39 @@ class GameState {
     this.stats.totalExpenses += total;
     this.stats.todayExpenses += total;
 
-    this._logFinance('expense', 'Аренда (день)', rent);
-    this._logFinance('expense', 'Коммунальные', utilities);
+    this._logFinance('expense', 'Аренда за смену', rent);
+    this._logFinance('expense', 'Коммунальные платежи', utilities);
     if (salaries > 0) {
-      this._logFinance('expense', `Зарплаты (${this.employees.length} чел.)`, salaries);
+      this._logFinance('expense', `Зарплата (${this.employees.length} сотр.)`, salaries);
     }
 
     this.emit('stateChanged');
     return total;
+  }
+
+  /** Проверка инспекций на текущий день */
+  checkInspections() {
+    const insp = BALANCE.inspections.find(i => i.day === this.day);
+    if (!insp) return null;
+
+    const hasDoc = this.documents[insp.type];
+    const docDef = BALANCE.documents[insp.type];
+
+    if (!hasDoc) {
+      // Нарушение: штраф
+      const fine = docDef ? docDef.fine : 100_000;
+      this.money -= fine;
+      this.stats.totalExpenses += fine;
+      this.stats.todayExpenses += fine;
+      this.changeReputation(-10);
+      this._logFinance('expense', `ШТРАФ: ${insp.name} (нет документа)`, fine);
+      this.emit('stateChanged');
+      return { passed: false, insp, fine, docDef };
+    }
+
+    // Проверка пройдена
+    this.changeReputation(5);
+    return { passed: true, insp, docDef };
   }
 
   /** Покупка улучшения */
@@ -206,7 +307,7 @@ class GameState {
       name: this._generateEmployeeName(),
       speed: BALANCE.employee.baseSpeed,
       quality: BALANCE.employee.baseQuality,
-      status: 'idle', // idle, working, unavailable
+      status: 'idle',
       assignedPost: null,
       assignedCar: null,
     };
@@ -220,7 +321,6 @@ class GameState {
     const idx = this.employees.findIndex(e => e.id === empId);
     if (idx === -1) return false;
     const emp = this.employees[idx];
-    // Освободить пост
     if (emp.assignedPost) {
       const post = this.posts.find(p => p.id === emp.assignedPost);
       if (post) {
@@ -245,19 +345,15 @@ class GameState {
     const car = {
       id: genId('car'),
       carClass: carClassId,
-      state: 'waiting',       // waiting, washing, done, leaving
-      washStage: -1,           // -1 = не начата
-      washProgress: 0,        // 0-100
+      state: 'waiting',
+      washStage: -1,
+      washProgress: 0,
       quality: 0,
       paid: false,
       completed: false,
-      patience: BALANCE.customer.basePatience +
-        (Math.random() * 2 - 1) * BALANCE.customer.patienceVariance,
+      patience: BALANCE.customer.basePatience + (Math.random() * 2 - 1) * BALANCE.customer.patienceVariance,
       waitTime: 0,
       postId: null,
-      priceSensitivity: 0.3 + Math.random() * 0.7,
-      expectedQuality: 0.3 + Math.random() * 0.5,
-      isRepeat: false,
     };
 
     this.cars.push(car);
@@ -266,11 +362,9 @@ class GameState {
     return car;
   }
 
-  /** Удалить машину */
   removeCar(carId) {
     this.queue = this.queue.filter(id => id !== carId);
     this.cars = this.cars.filter(c => c.id !== carId);
-    // Освободить пост
     for (const post of this.posts) {
       if (post.carId === carId) {
         post.busy = false;
@@ -284,12 +378,6 @@ class GameState {
     return this.cars.find(c => c.id === carId);
   }
 
-  /** Найти свободный пост */
-  findFreePost() {
-    return this.posts.find(p => !p.busy && !p.broken);
-  }
-
-  /** Назначить машину на пост */
   assignCarToPost(carId, postId) {
     const car = this.getCar(carId);
     const post = this.posts.find(p => p.id === postId);
@@ -304,7 +392,6 @@ class GameState {
     return true;
   }
 
-  /** Сменить день */
   nextDay() {
     this.day++;
     this.shiftTimeRemaining = BALANCE.time.shiftDurationMs;
@@ -312,7 +399,6 @@ class GameState {
     this.stats.todayRevenue = 0;
     this.stats.todayExpenses = 0;
 
-    // Маркетинг
     if (this.marketingActive) {
       this.marketingDaysLeft--;
       if (this.marketingDaysLeft <= 0) {
@@ -326,7 +412,6 @@ class GameState {
     this.emit('stateChanged');
   }
 
-  /** Репутация */
   changeReputation(amount) {
     this.reputation = Math.max(
       BALANCE.reputation.min,
@@ -334,7 +419,6 @@ class GameState {
     );
   }
 
-  /** Запустить маркетинговую кампанию */
   startMarketing() {
     if (this.marketingActive) return { success: false, reason: 'Кампания уже активна' };
     if (this.money < BALANCE.marketing.campaignCost) {
@@ -350,7 +434,6 @@ class GameState {
     return { success: true };
   }
 
-  /** Программа лояльности */
   enableLoyalty() {
     if (this.loyaltyActive) return { success: false, reason: 'Уже активна' };
     if (this.money < BALANCE.loyalty.setupCost) {
@@ -364,7 +447,6 @@ class GameState {
     return { success: true };
   }
 
-  /** Изменить цену */
   setServicePrice(newPrice) {
     const { minPrice, maxPrice } = BALANCE.services.expressWash;
     newPrice = Math.round(newPrice);
@@ -374,9 +456,8 @@ class GameState {
     return true;
   }
 
-  /** Сюжетный флаг */
   setStoryFlag(flag, value = true) {
-    if (this.storyFlags[flag]) return false; // уже установлен
+    if (this.storyFlags[flag]) return false;
     this.storyFlags[flag] = value;
     this.emit('stateChanged');
     return true;
@@ -386,7 +467,6 @@ class GameState {
     return !!this.storyFlags[flag];
   }
 
-  /** Поломка */
   breakPost(postId) {
     const post = this.posts.find(p => p.id === postId);
     if (!post || post.broken) return false;
@@ -399,37 +479,32 @@ class GameState {
 
   repairPost(postId) {
     const post = this.posts.find(p => p.id === postId);
-    if (!post || !post.broken) return { success: false, reason: 'Пост не сломан' };
+    if (!post || !post.broken) return { success: false, reason: 'Бокс исправен' };
     const cost = BALANCE.breakdown.repairCostBase;
     if (this.money < cost) return { success: false, reason: 'Недостаточно средств' };
     this.money -= cost;
     this.stats.totalExpenses += cost;
     this.stats.todayExpenses += cost;
-    this._logFinance('expense', `Ремонт поста`, cost);
+    this._logFinance('expense', `Ремонт бокса`, cost);
     post.broken = false;
     this.emit('stateChanged');
     return { success: true };
   }
 
-  /** Получить множитель спроса */
   getDemandMultiplier() {
     const loc = this.getLocation();
     if (!loc) return 1;
     let mult = loc.customerFlow;
 
-    // Репутация
     mult *= 0.5 + (this.reputation / 100) * 1.0;
 
-    // Цена (чем выше цена, тем меньше спрос)
     const priceRatio = this.servicePrice / BALANCE.services.expressWash.basePrice;
     mult *= Math.max(0.3, 1.5 - priceRatio * 0.5);
 
-    // Маркетинг
     if (this.marketingActive) {
       mult *= BALANCE.marketing.customerFlowBoost;
     }
 
-    // Конкурент
     if (this.competitorPriceWar) {
       mult *= (1 - BALANCE.competitor.demandReductionDuringWar);
     }
@@ -437,7 +512,6 @@ class GameState {
     return Math.max(0.1, mult);
   }
 
-  /** Финансовый лог */
   _logFinance(type, description, amount) {
     this.financialLog.push({
       id: genId('fin'),
@@ -447,7 +521,6 @@ class GameState {
       day: this.day,
       timestamp: Date.now(),
     });
-    // Лимитируем историю
     if (this.financialLog.length > 500) {
       this.financialLog = this.financialLog.slice(-400);
     }
@@ -460,7 +533,6 @@ class GameState {
            surnames[Math.floor(Math.random() * surnames.length)];
   }
 
-  /** Сериализация для сохранения */
   serialize() {
     return {
       saveVersion: this.saveVersion,
@@ -468,6 +540,9 @@ class GameState {
       day: this.day,
       money: this.money,
       location: this.location,
+      equipmentType: this.equipmentType,
+      documents: { ...this.documents },
+      suppliesStock: this.suppliesStock,
       reputation: this.reputation,
       upgrades: { ...this.upgrades },
       employees: this.employees.map(e => ({ ...e })),
@@ -489,7 +564,6 @@ class GameState {
     };
   }
 
-  /** Десериализация из сохранения */
   deserialize(data) {
     if (!data || typeof data !== 'object') return false;
     if (!data.saveVersion || !data.initialized) return false;
@@ -500,6 +574,15 @@ class GameState {
     this.day = data.day || 1;
     this.money = typeof data.money === 'number' && isFinite(data.money) ? data.money : BALANCE.startingBalance;
     this.location = data.location;
+    this.equipmentType = data.equipmentType || 'used';
+
+    if (data.documents && typeof data.documents === 'object') {
+      this.documents = { ...this.documents, ...data.documents };
+    }
+    if (typeof data.suppliesStock === 'number') {
+      this.suppliesStock = data.suppliesStock;
+    }
+
     this.reputation = typeof data.reputation === 'number' ?
       Math.max(BALANCE.reputation.min, Math.min(BALANCE.reputation.max, data.reputation)) :
       BALANCE.reputation.initial;
@@ -542,7 +625,6 @@ class GameState {
     return true;
   }
 
-  // Простой event emitter
   on(event, fn) {
     if (!this._listeners[event]) this._listeners[event] = [];
     this._listeners[event].push(fn);
@@ -561,6 +643,5 @@ class GameState {
   }
 }
 
-// Синглтон
 export const gameState = new GameState();
 export default gameState;

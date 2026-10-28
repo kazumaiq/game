@@ -4,15 +4,20 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Автомойка" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="theme-color" content="#1a1a2e" />
+  <meta name="theme-color" content="#090c10" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <title>Автомойка: Бизнес на грани</title>
   <link rel="stylesheet" href="/src/styles/main.css" />
 </head>
 <body>
-  <div id="game-container"></div>
-  <div id="ui-overlay"></div>
+  <!-- Единый контейнер всего приложения для честного Fullscreen API -->
+  <div id="game-shell">
+    <div id="game-container"></div>
+    <div id="ui-overlay"></div>
+  </div>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
