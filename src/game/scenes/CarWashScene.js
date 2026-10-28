@@ -56,6 +56,10 @@ export default class CarWashScene extends Phaser.Scene {
     this._targetHighlight = this.add.graphics();
     this._targetHighlight.setDepth(18);
 
+    // Слой струи воды и пены высокого давления
+    this._sprayGfx = this.add.graphics();
+    this._sprayGfx.setDepth(22);
+
     this._storySystem = new StorySystem();
     this._tutorialSystem = tutorialSystem;
 
@@ -105,45 +109,42 @@ export default class CarWashScene extends Phaser.Scene {
   }
 
   _createEnvironment() {
+    // 1. Зеленый стриженый газон
     for (let x = 0; x < WORLD.width; x += 64) {
       for (let y = 0; y < WORLD.height; y += 64) {
         this.add.image(x + 32, y + 32, 'lawn_tile').setDepth(0);
       }
     }
 
-    const yardW = 820;
-    const yardH = 470;
+    const yardW = 824;
+    const yardH = 472;
     const yardX = WORLD.width / 2;
     const yardY = 270;
 
-    const border = this.add.rectangle(yardX, yardY, yardW + 10, yardH + 10, 0x334155);
+    // 2. Бордюрный камень площадки (бетон с объемной тенью)
+    const borderShadow = this.add.rectangle(yardX + 2, yardY + 4, yardW + 12, yardH + 12, 0x070a10, 0.45);
+    borderShadow.setDepth(1);
+    const border = this.add.rectangle(yardX, yardY, yardW + 8, yardH + 8, 0x334155);
     border.setDepth(1);
 
+    // 3. Текстурированный графитовый асфальт автомойки
     const yard = this.add.tileSprite(yardX, yardY, yardW, yardH, 'asphalt_ground');
     yard.setDepth(2);
 
+    // 4. Дорожное полотно с разделительной полосой
     const road = this.add.tileSprite(WORLD.width / 2, WORLD.roadY, WORLD.width, 80, 'road_strip');
     road.setDepth(3);
 
-    this.add.text(WORLD.entrance.x, WORLD.entrance.y - 32, '➔ ВЪЕЗД', {
-      fontSize: '12px',
-      color: '#38bdf8',
-      fontStyle: 'bold',
-      fontFamily: 'sans-serif',
-    }).setDepth(4);
+    // 5. Разметка на асфальте (дорожки, стрелки въезда/выезда, мокрые пятна)
+    this._createGroundMarkings();
 
-    this.add.text(WORLD.exit.x, WORLD.exit.y - 32, 'ВЫЕЗД ➔', {
-      fontSize: '12px',
-      color: '#22c55e',
-      fontStyle: 'bold',
-      fontFamily: 'sans-serif',
-    }).setOrigin(1, 0).setDepth(4);
-
+    // 6. Главное административное здание автомойки
     this._building = this.add.image(WORLD.building.x, WORLD.building.y, 'building_complex');
     this._building.setDepth(7);
 
-    // Моечные боксы (пол имеет depth: 5, крыша и стойки поверх пола)
+    // 7. Моечные боксы
     this._postSprites = [];
+    this._postStatusLabels = [];
     for (let i = 0; i < WORLD.posts.length; i++) {
       const pos = WORLD.posts[i];
       const postData = gameState.posts[i];
@@ -151,28 +152,116 @@ export default class CarWashScene extends Phaser.Scene {
       
       const sprite = this.add.image(pos.x, pos.y, tex).setDepth(6);
       
-      this.add.text(pos.x, pos.y - 68, pos.label, {
-        fontSize: '13px',
-        color: '#f8fafc',
-        backgroundColor: '#0f172a',
+      const lbl = this.add.text(pos.x, pos.y - 74, `${pos.label} • СВОБОДЕН`, {
+        fontSize: '11px',
+        color: '#38bdf8',
+        backgroundColor: 'rgba(15, 23, 42, 0.95)',
         padding: { x: 8, y: 3 },
-        fontFamily: 'sans-serif',
+        fontFamily: 'system-ui, sans-serif',
         fontStyle: 'bold',
       }).setOrigin(0.5).setDepth(8);
 
       this._postSprites.push(sprite);
+      this._postStatusLabels.push(lbl);
     }
 
-    this.add.image(180, 180, 'potted_tree').setDepth(7);
-    this.add.image(720, 180, 'potted_tree').setDepth(7);
-    this.add.image(30, 260, 'lamp_post').setDepth(7);
-    this.add.image(870, 260, 'lamp_post').setDepth(7);
-
-    this.add.image(WORLD.entrance.x + 35, WORLD.entrance.y - 60, 'cone').setDepth(7);
-    this.add.image(WORLD.entrance.x + 65, WORLD.entrance.y - 60, 'cone').setDepth(7);
+    // 8. Декорации и освещение
+    this._createScenery();
 
     this.physics.world.setBounds(20, 170, WORLD.width - 40, WORLD.height - 210);
     this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
+  }
+
+  _createGroundMarkings() {
+    const mg = this.add.graphics();
+    mg.setDepth(3);
+
+    // Влажные пятна с отражениями под моечными боксами
+    for (let i = 0; i < WORLD.posts.length; i++) {
+      const pos = WORLD.posts[i];
+      mg.fillStyle(0x0ea5e9, 0.08);
+      mg.fillEllipse(pos.x, pos.y + 16, 170, 75);
+      mg.fillStyle(0x38bdf8, 0.05);
+      mg.fillEllipse(pos.x, pos.y + 14, 130, 50);
+    }
+
+    // Дренажные решетки перед боксами
+    this.add.image(WORLD.posts[0].x, WORLD.posts[0].y + 60, 'drainage_grate').setDepth(3);
+    this.add.image(WORLD.posts[1].x, WORLD.posts[1].y + 60, 'drainage_grate').setDepth(3);
+
+    // Пешеходный переход безопасности (желто-белая разметка)
+    mg.fillStyle(0xf59e0b, 0.85);
+    for (let y = 195; y < 270; y += 12) {
+      mg.fillRect(435, y, 30, 6);
+    }
+
+    // Направляющие линии въезда
+    mg.lineStyle(2, 0x38bdf8, 0.6);
+    mg.strokeLineShape(new Phaser.Geom.Line(WORLD.entrance.x + 20, WORLD.entrance.y - 20, 130, 490));
+
+    // Направляющие линии выезда
+    mg.lineStyle(2, 0x22c55e, 0.6);
+    mg.strokeLineShape(new Phaser.Geom.Line(WORLD.posts[1].x + 90, WORLD.posts[1].y + 20, WORLD.exit.x - 20, WORLD.exit.y - 20));
+
+    // Трафаретные указатели движения
+    this.add.text(WORLD.entrance.x, WORLD.entrance.y - 32, '➔ ВЪЕЗД', {
+      fontSize: '12px',
+      color: '#38bdf8',
+      fontStyle: 'bold',
+      fontFamily: 'system-ui, sans-serif',
+      backgroundColor: 'rgba(15, 23, 42, 0.85)',
+      padding: { x: 6, y: 2 },
+    }).setDepth(4);
+
+    this.add.text(WORLD.exit.x, WORLD.exit.y - 32, 'ВЫЕЗД ➔', {
+      fontSize: '12px',
+      color: '#22c55e',
+      fontStyle: 'bold',
+      fontFamily: 'system-ui, sans-serif',
+      backgroundColor: 'rgba(15, 23, 42, 0.85)',
+      padding: { x: 6, y: 2 },
+    }).setOrigin(1, 0).setDepth(4);
+  }
+
+  _createScenery() {
+    // Зеленые насаждения в кадках
+    this.add.image(170, 180, 'potted_tree').setDepth(7);
+    this.add.image(730, 180, 'potted_tree').setDepth(7);
+    this.add.image(450, 480, 'potted_tree').setDepth(7);
+
+    // Уличные фонари с мягким световым ореолом
+    const lamp1 = this.add.image(30, 260, 'lamp_post').setDepth(7);
+    const lamp2 = this.add.image(870, 260, 'lamp_post').setDepth(7);
+
+    const lg = this.add.graphics().setDepth(3);
+    // Световые круги на земле от фонарей
+    lg.fillStyle(0xfef08a, 0.05);
+    lg.fillCircle(30, 280, 50);
+    lg.fillCircle(870, 280, 50);
+
+    // Ограждающие конусы
+    this.add.image(WORLD.entrance.x + 35, WORLD.entrance.y - 60, 'cone').setDepth(7);
+    this.add.image(WORLD.entrance.x + 65, WORLD.entrance.y - 60, 'cone').setDepth(7);
+  }
+
+  _updatePostStatuses() {
+    if (!this._postStatusLabels) return;
+    for (let i = 0; i < gameState.posts.length; i++) {
+      const post = gameState.posts[i];
+      const lbl = this._postStatusLabels[i];
+      if (!lbl) continue;
+
+      if (post.broken) {
+        lbl.setText(`⚠ ${WORLD.posts[i].label} • АВАРИЯ`);
+        lbl.setColor('#ef4444');
+      } else if (post.busy) {
+        lbl.setText(`🚿 ${WORLD.posts[i].label} • МОЙКА`);
+        lbl.setColor('#22c55e');
+      } else {
+        lbl.setText(`✓ ${WORLD.posts[i].label} • СВОБОДЕН`);
+        lbl.setColor('#38bdf8');
+      }
+    }
   }
 
   _createPlayer() {
@@ -440,10 +529,18 @@ export default class CarWashScene extends Phaser.Scene {
         const pos = WORLD.posts[i];
         const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, pos.x, pos.y);
         if (dist < 100) {
+          this.player.setTexture('player_repair');
+          this._spawnRepairSparks(pos.x, pos.y);
+          this.time.delayedCall(450, () => {
+            if (!this._isWashing && this.player) {
+              this.player.setTexture('player_idle');
+            }
+          });
           const result = gameState.repairPost(post.id);
           if (result.success) {
             this._postSprites[i].setTexture('wash_bay_normal');
             showToast('Бокс успешно отремонтирован!', 'success');
+            this._updatePostStatuses();
           } else {
             showToast(result.reason, 'warning');
           }
@@ -514,6 +611,12 @@ export default class CarWashScene extends Phaser.Scene {
       showWashProgress(stageName, car.washProgress, car.washProgress >= 100 ? 'Этап готов! Нажми для перехода' : 'Продолжай мойку!');
       this._updateCarVisual(car);
 
+      const sprite = this._carSprites[car.id];
+      if (sprite) {
+        const isFoam = stages[car.washStage] === 'foam';
+        this._spawnSplashBurst(sprite.x, sprite.y, isFoam);
+      }
+
       if (car.washProgress >= 100) {
         if (car.washStage < stages.length - 1) {
           car.washStage++;
@@ -554,6 +657,11 @@ export default class CarWashScene extends Phaser.Scene {
 
     showToast(`Готово! Клиент оплатил +${this._formatMoney(profit)}`, 'success');
     this._updateCarVisual(car);
+
+    const carSprite = this._carSprites[car.id];
+    if (carSprite) {
+      this._spawnCleanSparkles(carSprite.x, carSprite.y);
+    }
 
     this.time.delayedCall(1400, () => {
       this._carLeave(car.id);
@@ -680,9 +788,9 @@ export default class CarWashScene extends Phaser.Scene {
     if (car.completed) {
       texKey = `car_${car.carClass}`;
     } else if (stage === 'foam') {
-      texKey = car.washProgress > 50 ? `car_${car.carClass}_foam` : `car_${car.carClass}_dirty`;
+      texKey = car.washProgress > 30 ? `car_${car.carClass}_foam` : `car_${car.carClass}_dirty`;
     } else if (stage === 'rinse') {
-      texKey = car.washProgress > 50 ? `car_${car.carClass}` : `car_${car.carClass}_foam`;
+      texKey = car.washProgress > 60 ? `car_${car.carClass}` : `car_${car.carClass}_rinse`;
     } else if (stage === 'finish') {
       texKey = `car_${car.carClass}`;
     } else {
@@ -861,6 +969,8 @@ export default class CarWashScene extends Phaser.Scene {
     this._updateDepth();
     this._updateActionBtnContext();
     this._updateTargetHighlight(time);
+    this._updateSprayEffect(time);
+    this._updatePostStatuses();
 
     if (Math.floor(time / 250) !== Math.floor((time - delta) / 250)) {
       updateHUD();
@@ -1044,6 +1154,110 @@ export default class CarWashScene extends Phaser.Scene {
     saveSystem.save();
   }
 
+  _updateSprayEffect(time) {
+    if (!this._sprayGfx) return;
+    this._sprayGfx.clear();
+
+    if (!this._isWashing || !this._washingCar) return;
+
+    const car = gameState.getCar(this._washingCar);
+    const sprite = this._carSprites[this._washingCar];
+    if (!car || !sprite) return;
+
+    const stages = BALANCE.services.expressWash.stages;
+    const currentStage = stages[car.washStage] || 'foam';
+
+    const pX = this.player.x + 14;
+    const pY = this.player.y - 6;
+
+    const t = (time || 0) * 0.006;
+    const targetX = sprite.x + Math.sin(t * 3) * 16;
+    const targetY = sprite.y + Math.cos(t * 4) * 8;
+
+    const isFoam = currentStage === 'foam';
+    const sprayColor = isFoam ? 0xffffff : 0x38bdf8;
+    const sprayAlpha = isFoam ? 0.8 : 0.65;
+
+    // Струя воды/пены под высоким давлением (конус)
+    this._sprayGfx.lineStyle(3, sprayColor, sprayAlpha);
+    this._sprayGfx.lineBetween(pX, pY, targetX, targetY);
+
+    this._sprayGfx.lineStyle(1.5, sprayColor, sprayAlpha * 0.45);
+    this._sprayGfx.lineBetween(pX, pY, targetX - 10, targetY - 6);
+    this._sprayGfx.lineBetween(pX, pY, targetX + 10, targetY + 6);
+
+    // Пятно контакта и водяная пыль
+    this._sprayGfx.fillStyle(sprayColor, 0.85);
+    this._sprayGfx.fillCircle(targetX, targetY, isFoam ? 9 : 6);
+    this._sprayGfx.fillStyle(0xffffff, 0.4);
+    this._sprayGfx.fillCircle(targetX, targetY, isFoam ? 16 : 11);
+  }
+
+  _spawnSplashBurst(x, y, isFoam = false) {
+    const tex = isFoam ? 'particle_foam' : 'particle_water';
+    for (let i = 0; i < 7; i++) {
+      const p = this.add.image(x, y, tex).setDepth(23);
+      const angle = (Math.PI * 2 * i) / 7 + (Math.random() - 0.5) * 0.5;
+      const speed = 25 + Math.random() * 35;
+      this.tweens.add({
+        targets: p,
+        x: x + Math.cos(angle) * speed,
+        y: y + Math.sin(angle) * speed,
+        scale: { from: 1, to: 0.2 },
+        alpha: { from: 1, to: 0 },
+        duration: 320 + Math.random() * 120,
+        ease: 'Power1',
+        onComplete: () => p.destroy(),
+      });
+    }
+  }
+
+  _spawnCleanSparkles(x, y) {
+    const offsets = [
+      { dx: -35, dy: -14 },
+      { dx: 30, dy: -12 },
+      { dx: -20, dy: 16 },
+      { dx: 25, dy: 14 },
+    ];
+    for (let i = 0; i < offsets.length; i++) {
+      this.time.delayedCall(i * 120, () => {
+        const off = offsets[i];
+        const star = this.add.text(x + off.dx, y + off.dy, '✦', {
+          fontSize: '18px',
+          color: '#fef08a',
+          fontStyle: 'bold',
+        }).setOrigin(0.5).setDepth(24);
+
+        this.tweens.add({
+          targets: star,
+          scale: { from: 0.3, to: 1.4 },
+          alpha: { from: 1, to: 0 },
+          y: y + off.dy - 12,
+          duration: 500,
+          ease: 'Back.easeOut',
+          onComplete: () => star.destroy(),
+        });
+      });
+    }
+  }
+
+  _spawnRepairSparks(x, y) {
+    for (let i = 0; i < 9; i++) {
+      const spark = this.add.rectangle(x, y - 20, 3, 3, i % 2 === 0 ? 0xf59e0b : 0xef4444);
+      spark.setDepth(23);
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.6;
+      const speed = 20 + Math.random() * 30;
+      this.tweens.add({
+        targets: spark,
+        x: x + Math.cos(angle) * speed,
+        y: y - 20 + Math.sin(angle) * speed,
+        alpha: { from: 1, to: 0 },
+        duration: 250 + Math.random() * 150,
+        onComplete: () => spark.destroy(),
+      });
+    }
+  }
+
   _formatMoney(amount) {
     if (typeof amount !== 'number' || !isFinite(amount)) return '0 ₽';
     return amount.toLocaleString('ru-RU') + ' ₽';
@@ -1059,6 +1273,10 @@ export default class CarWashScene extends Phaser.Scene {
 
     if (this._targetHighlight) {
       this._targetHighlight.destroy();
+    }
+
+    if (this._sprayGfx) {
+      this._sprayGfx.destroy();
     }
 
     if (this._touchControlsRoot) {

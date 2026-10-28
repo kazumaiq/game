@@ -372,29 +372,33 @@ html, body {
   letter-spacing: 0.4px;
 }
 
-/* ================= ОНБОРДИНГ (НОВАЯ ИГРА: 3 ШАГА) ================= */
+/* ================= ОНБОРДИНГ (НОВАЯ ИГРА: 4 ЭТАПА) ================= */
 .onboarding-screen {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
   background: radial-gradient(circle at center, #1e293b 0%, #090d16 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 500;
-  padding: calc(var(--safe-top) + 16px) calc(var(--safe-right) + 16px) calc(var(--safe-bottom) + 16px) calc(var(--safe-left) + 16px);
+  padding: calc(var(--safe-top) + 12px) calc(var(--safe-right) + 12px) calc(var(--safe-bottom) + 12px) calc(var(--safe-left) + 12px);
+  box-sizing: border-box;
+  overflow-y: auto;
 }
 
 .onboarding-card {
   background: var(--panel-bg);
   border: 1px solid rgba(56, 189, 248, 0.35);
   border-radius: 16px;
-  padding: 20px;
+  padding: 18px;
   max-width: 480px;
   width: 100%;
-  max-height: 90vh;
+  max-height: calc(100dvh - 32px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
@@ -403,6 +407,7 @@ html, body {
   align-items: center;
   text-align: center;
   animation: popIn 0.2s ease-out;
+  box-sizing: border-box;
 }
 
 .step-indicator {
@@ -1217,9 +1222,58 @@ html, body {
 /* Улучшения и сотрудники */
 .upgrade-item, .employee-card {
   background: var(--card-bg);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 6px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.08s, border-color 0.15s;
+}
+
+.upgrade-item:hover, .employee-card:hover {
+  border-color: rgba(56, 189, 248, 0.45);
+}
+
+.upgrade-info .name, .employee-info .name {
+  font-weight: 700;
+  font-size: 13px;
+  color: #f1f5f9;
+}
+
+.upgrade-info .desc, .employee-info .status {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.upgrade-info .level {
+  font-size: 11px;
+  color: #38bdf8;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+/* Разделы панели бизнеса и карточки документов */
+.panel-section {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.panel-section:last-child {
+  margin-bottom: 0;
+}
+
+.doc-card {
+  background: rgba(30, 41, 59, 0.65);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
-  padding: 10px;
+  padding: 9px 12px;
   margin: 6px 0;
   display: flex;
   justify-content: space-between;
@@ -1227,18 +1281,43 @@ html, body {
   gap: 8px;
 }
 
-.upgrade-info .name, .employee-info .name {
+.doc-card.obtained {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.doc-card.missing {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.doc-title {
   font-weight: 700;
-  font-size: 13px;
+  font-size: 12px;
+  color: #f1f5f9;
 }
 
-.upgrade-info .desc, .employee-info .status {
+.doc-status.ok {
+  color: #4ade80;
   font-size: 11px;
-  color: #94a3b8;
-}
-
-.upgrade-info .level {
-  font-size: 11px;
-  color: #38bdf8;
   font-weight: 600;
+  margin-top: 2px;
+}
+
+.doc-status.alert {
+  color: #f87171;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.doc-badge-ok {
+  font-size: 10px;
+  font-weight: 800;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid #22c55e;
+  border-radius: 6px;
+  padding: 4px 8px;
+  white-space: nowrap;
 }
