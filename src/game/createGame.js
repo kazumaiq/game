@@ -1,6 +1,3 @@
-/**
- * createGame.js — инициализация инстанса игры Phaser.
- */
 import Phaser from 'phaser';
 import BootScene from './scenes/BootScene.js';
 import MenuScene from './scenes/MenuScene.js';
@@ -8,14 +5,15 @@ import LocationSelectScene from './scenes/LocationSelectScene.js';
 import CarWashScene from './scenes/CarWashScene.js';
 
 export function createGame() {
+  const isPortrait = window.innerHeight > window.innerWidth;
+  // На мобильных устройствах ориентируемся на отзывчивый RESIZE с динамическим зумом и центровкой
   const config = {
     type: Phaser.AUTO,
     parent: 'game-container',
-    width: 900,
-    height: 700,
-    backgroundColor: '#1a1a2e',
     scale: {
-      mode: Phaser.Scale.FIT,
+      mode: Phaser.Scale.RESIZE,
+      width: '100%',
+      height: '100%',
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
     physics: {
@@ -25,6 +23,10 @@ export function createGame() {
         debug: false,
       },
     },
+    input: {
+      activePointers: 3, // мультитач: стик + кнопка действия одновременно
+    },
+    backgroundColor: '#161623',
     scene: [BootScene, MenuScene, LocationSelectScene, CarWashScene],
   };
 

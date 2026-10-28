@@ -1,12 +1,11 @@
 /**
- * HudUI — верхняя панель информации + кнопки управления.
+ * HudUI — адаптивный интерфейс: компактный мобильный вид + десктоп.
  */
 import gameState from '../game/systems/GameState.js';
 import BALANCE from '../game/config/balance.js';
 import { showBusinessPanel } from './BusinessPanelUI.js';
 import { showUpgradePanel } from './UpgradePanelUI.js';
 import { showToast } from './ToastUI.js';
-import saveSystem from '../game/systems/SaveSystem.js';
 
 let _hudElement = null;
 let _scene = null;
@@ -23,31 +22,30 @@ export function createHUD(scene) {
   const overlay = document.getElementById('ui-overlay');
   const hud = document.createElement('div');
   hud.id = 'game-hud';
+  hud.className = 'hud';
   hud.innerHTML = `
-    <div class="hud">
-      <div class="hud-left">
-        <div class="hud-stat"><span class="label">Баланс</span> <span class="value" id="hud-money">0 ₽</span></div>
+    <div class="hud-top-bar">
+      <div class="hud-stats-group">
+        <div class="hud-stat"><span class="label">₽</span> <span class="value" id="hud-money">0 ₽</span></div>
         <div class="hud-stat"><span class="label">День</span> <span class="value" id="hud-day">1</span></div>
+        <div class="hud-stat"><span class="label">★</span> <span class="value" id="hud-rep">50</span></div>
       </div>
-      <div class="hud-center">
-        <div class="hud-stat"><span class="label">Репутация</span> <span class="value" id="hud-rep">50</span></div>
-        <div class="hud-stat"><span class="label">Очередь</span> <span class="value" id="hud-queue">0</span></div>
-        <div class="hud-stat"><span class="label">Помыто</span> <span class="value" id="hud-washed">0</span></div>
-      </div>
-      <div class="hud-right">
-        <button class="game-btn" id="hud-business">Бизнес</button>
-        <button class="game-btn" id="hud-upgrades">Улучшения</button>
-        <button class="game-btn" id="hud-pause">⏸</button>
-        <button class="game-btn primary" id="hud-end-shift">Завершить смену</button>
+      <div class="hud-buttons-group">
+        <button class="game-btn icon-btn" id="hud-business" title="Бизнес">💼</button>
+        <button class="game-btn icon-btn" id="hud-upgrades" title="Улучшения">⚡</button>
+        <button class="game-btn icon-btn" id="hud-pause" title="Пауза">⏸</button>
+        <button class="game-btn primary" id="hud-end-shift" style="font-size:11px;padding:4px 8px;min-height:32px;">Смена ❯</button>
       </div>
     </div>
-    <div id="hud-posts" style="position:absolute;top:40px;left:12px;display:flex;gap:6px;">
-      <div class="hud-stat" id="hud-post-1"><span class="label">Пост 1:</span> <span class="value" id="hud-post1-status">Свободен</span></div>
-      <div class="hud-stat" id="hud-post-2"><span class="label">Пост 2:</span> <span class="value" id="hud-post2-status">Свободен</span></div>
-    </div>
-    <div id="hud-shift-bar" style="position:absolute;top:40px;right:12px;">
-      <div class="hud-stat"><span class="label">Смена</span>
-        <div class="progress-bar" style="width:100px;display:inline-block;vertical-align:middle;">
+    <div class="hud-sub-bar">
+      <div class="hud-stats-group">
+        <div class="hud-stat" id="hud-post-1"><span class="label">П1:</span> <span class="value" id="hud-post1-status">Свободен</span></div>
+        <div class="hud-stat" id="hud-post-2"><span class="label">П2:</span> <span class="value" id="hud-post2-status">Свободен</span></div>
+        <div class="hud-stat"><span class="label">Очередь:</span> <span class="value" id="hud-queue">0</span></div>
+      </div>
+      <div class="hud-stat" style="min-width:70px;">
+        <span class="label">Смена</span>
+        <div class="progress-bar" style="width:40px;display:inline-block;vertical-align:middle;margin:0 2px;">
           <div class="fill" id="hud-shift-fill" style="width:100%"></div>
         </div>
       </div>
@@ -56,7 +54,6 @@ export function createHUD(scene) {
   overlay.appendChild(hud);
   _hudElement = hud;
 
-  // Event listeners
   document.getElementById('hud-business').addEventListener('click', () => showBusinessPanel());
   document.getElementById('hud-upgrades').addEventListener('click', () => showUpgradePanel());
   document.getElementById('hud-pause').addEventListener('click', () => {
@@ -70,8 +67,9 @@ export function createHUD(scene) {
       document.getElementById('hud-pause').textContent = '⏸';
     }
   });
+
   document.getElementById('hud-end-shift').addEventListener('click', () => {
-    if (confirm('Завершить смену? Оставшиеся клиенты уедут.')) {
+    if (confirm('Завершить смену?')) {
       _scene.endShift();
     }
   });
@@ -86,7 +84,6 @@ export function updateHUD() {
   const dayEl = document.getElementById('hud-day');
   const repEl = document.getElementById('hud-rep');
   const queueEl = document.getElementById('hud-queue');
-  const washedEl = document.getElementById('hud-washed');
   const shiftFill = document.getElementById('hud-shift-fill');
 
   if (moneyEl) {
@@ -96,23 +93,21 @@ export function updateHUD() {
   if (dayEl) dayEl.textContent = gameState.day;
   if (repEl) repEl.textContent = Math.round(gameState.reputation);
   if (queueEl) queueEl.textContent = gameState.queue.length;
-  if (washedEl) washedEl.textContent = gameState.stats.todayCarsWashed;
 
   if (shiftFill) {
     const pct = (gameState.shiftTimeRemaining / BALANCE.time.shiftDurationMs) * 100;
     shiftFill.style.width = Math.max(0, pct) + '%';
   }
 
-  // Статусы постов
   for (let i = 0; i < gameState.posts.length; i++) {
     const el = document.getElementById(`hud-post${i + 1}-status`);
     if (!el) continue;
     const post = gameState.posts[i];
     if (post.broken) {
-      el.textContent = 'Сломан!';
+      el.textContent = 'Слом!';
       el.style.color = '#ff6b6b';
     } else if (post.busy) {
-      el.textContent = 'Занят';
+      el.textContent = 'Мойка';
       el.style.color = '#f0932b';
     } else {
       el.textContent = 'Свободен';
