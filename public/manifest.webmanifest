@@ -1,0 +1,22 @@
+{
+  "name": "Автомойка: Бизнес на грани",
+  "short_name": "Автомойка",
+  "description": "Изометрический бизнес-симулятор автомойки",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#1a1a2e",
+  "theme_color": "#1a1a2e",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
