@@ -39,7 +39,14 @@ export function generateAssets(scene) {
   _generateCharacter(g, 'player_work', 3);
   _generateCharacter(g, 'player_repair', 4);
 
-  // 8. Автомобили: 4 класса x 4 состояния (dirty, foam, rinse, clean)
+  // 7b. Сотрудники (мойщики и техники в ярких оранжево-желтых спецовках)
+  _generateEmployee(g, 'employee_idle', 0);
+  _generateEmployee(g, 'employee_walk_1', 1);
+  _generateEmployee(g, 'employee_walk_2', 2);
+  _generateEmployee(g, 'employee_work', 3);
+  _generateEmployee(g, 'employee_repair', 4);
+
+  // 8. Автомобили: 6 классов x 4 состояния (dirty, foam, rinse, clean)
   const carTypes = [
     {
       id: 'compact',
@@ -84,6 +91,28 @@ export function generateAssets(scene) {
       wheelR: 9,
       wheelbase: 82,
       bodyType: 'coupe',
+    },
+    {
+      id: 'wagon',
+      w: 126,
+      h: 56,
+      baseColor: 0x0284c7,
+      roofColor: 0x0369a1,
+      accentColor: 0x38bdf8,
+      wheelR: 9,
+      wheelbase: 74,
+      bodyType: 'wagon',
+    },
+    {
+      id: 'van',
+      w: 136,
+      h: 66,
+      baseColor: 0xd946ef,
+      roofColor: 0xc026d3,
+      accentColor: 0xf0abfc,
+      wheelR: 10,
+      wheelbase: 80,
+      bodyType: 'van',
     },
   ];
 
@@ -702,11 +731,17 @@ function _generateCar(g, key, conf, state) {
   g.fillStyle(roofColor);
   g.fillRoundedRect(roofX, roofY, roofW, roofH, 4);
 
-  // Релинги для SUV или панорамный люк для Premium
-  if (conf.bodyType === 'suv') {
+  // Релинги для SUV, универсала, фургона или панорамный люк для Premium
+  if (conf.bodyType === 'suv' || conf.bodyType === 'wagon') {
     g.fillStyle(0x94a3b8);
-    g.fillRect(roofX + 4, roofY - 1, roofW - 8, 2);
-    g.fillRect(roofX + 4, roofY + roofH - 1, roofW - 8, 2);
+    g.fillRect(roofX + 2, roofY - 1, roofW - 4, 2);
+    g.fillRect(roofX + 2, roofY + roofH - 1, roofW - 4, 2);
+  } else if (conf.bodyType === 'van') {
+    // Рёбра жёсткости на крыше коммерческого фургона
+    g.fillStyle(0x334155);
+    for (let x = roofX + 6; x < roofX + roofW - 6; x += 10) {
+      g.fillRect(x, roofY + 2, 2, roofH - 4);
+    }
   } else if (conf.bodyType === 'coupe' || conf.id === 'premium') {
     g.fillStyle(0x0f172a, 0.85);
     g.fillRoundedRect(roofX + 8, roofY + 4, roofW - 16, roofH - 8, 2);
@@ -894,6 +929,115 @@ function _generateDecorations(g) {
   g.fillStyle(0xfef08a, 0.35);
   g.fillCircle(18, 12, 12);
   g.generateTexture('lamp_post', LW, LH);
+}
+
+/** 11. Сотрудник автомойки (профессиональная форма, отличная от игрока) */
+function _generateEmployee(g, key, frame = 0) {
+  g.clear();
+  const W = 46;
+  const H = 60;
+
+  // Контактная тень сотрудника
+  g.fillStyle(0x06090e, 0.5);
+  g.fillEllipse(23, 54, 26, 10);
+
+  let legOff1 = 0;
+  let legOff2 = 0;
+  let armOff1 = 0;
+  let armOff2 = 0;
+
+  if (frame === 1) {
+    legOff1 = -4; legOff2 = 4;
+    armOff1 = 3;  armOff2 = -3;
+  } else if (frame === 2) {
+    legOff1 = 4;  legOff2 = -4;
+    armOff1 = -3; armOff2 = 3;
+  }
+
+  // Брюки спецодежды (темно-серый графит)
+  g.fillStyle(0x334155);
+  g.fillRect(14, 34 + legOff1, 7, 15);
+  g.fillRect(25, 34 + legOff2, 7, 15);
+
+  // Нескользящие сапоги с усиленным мыском
+  g.fillStyle(0x0f172a);
+  g.fillRoundedRect(12, 47 + legOff1, 10, 7, 2);
+  g.fillRoundedRect(24, 47 + legOff2, 10, 7, 2);
+  g.fillStyle(0xf59e0b);
+  g.fillRect(12, 52 + legOff1, 10, 2);
+  g.fillRect(24, 52 + legOff2, 10, 2);
+
+  // Куртка униформы (яркий оранжево-желтый цвет безопасности)
+  g.fillStyle(0xf59e0b);
+  g.fillRoundedRect(11, 18, 24, 20, 5);
+
+  // Контрастные темные вставки на плечах и боках
+  g.fillStyle(0x1e293b);
+  g.fillRect(11, 18, 5, 20);
+  g.fillRect(30, 18, 5, 20);
+
+  // Светоотражающие полосы (серебристо-белые)
+  g.fillStyle(0xf8fafc, 0.9);
+  g.fillRect(11, 25, 24, 3);
+  g.fillRect(11, 32, 24, 2.5);
+
+  // Руки и рабочие перчатки
+  g.fillStyle(0xd97706);
+  if (frame === 3) {
+    // Поза мойки: руки с моечным пистолетом
+    g.fillRect(27, 20, 12, 6);
+    g.fillStyle(0x0f172a); // черная перчатка
+    g.fillCircle(38, 23, 4);
+
+    // Моечный пистолет
+    g.fillStyle(0x1e293b);
+    g.fillRect(36, 18, 5, 14);
+    g.fillStyle(0x94a3b8);
+    g.fillRect(39, 17, 18, 3);
+    g.fillStyle(0x38bdf8);
+    g.fillRect(57, 16, 4, 5);
+
+    // Шланг
+    g.lineStyle(2, 0x0284c7, 0.9);
+    g.beginPath();
+    g.moveTo(37, 32);
+    g.lineTo(31, 38);
+    g.lineTo(24, 44);
+    g.strokePath();
+  } else if (frame === 4) {
+    // Поза ремонта: руки с гаечным ключом
+    g.fillRect(25, 22, 10, 6);
+    g.fillStyle(0x0f172a);
+    g.fillCircle(35, 25, 4);
+    g.fillStyle(0x94a3b8);
+    g.fillRect(33, 22, 14, 4);
+    g.fillRect(45, 19, 4, 10);
+  } else {
+    // Ходьба / покой
+    g.fillRect(7, 20 + armOff1, 6, 14);
+    g.fillRect(33, 20 + armOff2, 6, 14);
+    g.fillStyle(0x0f172a);
+    g.fillCircle(10, 34 + armOff1, 3.5);
+    g.fillCircle(36, 34 + armOff2, 3.5);
+  }
+
+  // Голова
+  g.fillStyle(0xfcd34d);
+  g.fillCircle(23, 12, 7.5);
+
+  // Рабочая каска безопасности (желто-оранжевая, без кепки)
+  g.fillStyle(0xeab308);
+  g.fillRoundedRect(14, 5, 18, 8, 4);
+  g.fillRect(13, 10, 20, 3);
+
+  // Защитные очки на каске
+  g.fillStyle(0x0f172a);
+  g.fillRect(16, 7, 14, 2.5);
+  g.fillStyle(0x38bdf8, 0.95);
+  g.fillRect(18, 7, 4, 2);
+  g.fillRect(24, 7, 4, 2);
+
+  g.generateTexture(key, W, H);
 }
 
 export default generateAssets;

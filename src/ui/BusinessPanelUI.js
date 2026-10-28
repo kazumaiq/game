@@ -6,6 +6,7 @@ import gameState from '../game/systems/GameState.js';
 import BALANCE from '../game/config/balance.js';
 import { showToast } from './ToastUI.js';
 import { updateHUD } from './HudUI.js';
+import { audioManager } from '../game/systems/AudioManager.js';
 
 function fmt(n) {
   if (typeof n !== 'number' || !isFinite(n)) return '0 ₽';
@@ -136,7 +137,10 @@ export function showBusinessPanel() {
 
   overlay.appendChild(panel);
 
-  document.getElementById('business-close').addEventListener('click', () => panel.remove());
+  document.getElementById('business-close').addEventListener('click', () => {
+    audioManager.play('buttonClick');
+    panel.remove();
+  });
   panel.addEventListener('click', (e) => {
     if (e.target === panel) panel.remove();
   });
@@ -147,10 +151,12 @@ export function showBusinessPanel() {
       const docId = btn.dataset.buyDoc;
       const res = gameState.buyDocument(docId);
       if (res.success) {
+        audioManager.play('cashRegister');
         showToast(`Документ оформлен: ${res.doc.name}`, 'success');
         panel.remove();
         showBusinessPanel();
       } else {
+        audioManager.play('error');
         showToast(res.reason, 'warning');
       }
     });
@@ -158,12 +164,14 @@ export function showBusinessPanel() {
 
   // Цена
   document.getElementById('price-down').addEventListener('click', () => {
+    audioManager.play('buttonClick');
     const newPrice = gameState.servicePrice - 50;
     if (gameState.setServicePrice(newPrice)) {
       document.getElementById('price-display').textContent = fmt(gameState.servicePrice);
     }
   });
   document.getElementById('price-up').addEventListener('click', () => {
+    audioManager.play('buttonClick');
     const newPrice = gameState.servicePrice + 50;
     if (gameState.setServicePrice(newPrice)) {
       document.getElementById('price-display').textContent = fmt(gameState.servicePrice);
@@ -176,10 +184,12 @@ export function showBusinessPanel() {
     marketingBtn.addEventListener('click', () => {
       const result = gameState.startMarketing();
       if (result.success) {
+        audioManager.play('success');
         showToast('Реклама запущена!', 'success');
         panel.remove();
         showBusinessPanel();
       } else {
+        audioManager.play('error');
         showToast(result.reason, 'warning');
       }
     });
@@ -191,10 +201,12 @@ export function showBusinessPanel() {
     loyaltyBtn.addEventListener('click', () => {
       const result = gameState.enableLoyalty();
       if (result.success) {
+        audioManager.play('success');
         showToast('Программа лояльности подключена!', 'success');
         panel.remove();
         showBusinessPanel();
       } else {
+        audioManager.play('error');
         showToast(result.reason, 'warning');
       }
     });
@@ -206,10 +218,12 @@ export function showBusinessPanel() {
     hireBtn.addEventListener('click', () => {
       const result = gameState.hireEmployee();
       if (result.success) {
+        audioManager.play('success');
         showToast(`Нанят сотрудник: ${result.employee.name}`, 'success');
         panel.remove();
         showBusinessPanel();
       } else {
+        audioManager.play('error');
         showToast(result.reason, 'warning');
       }
     });
@@ -218,6 +232,7 @@ export function showBusinessPanel() {
   // Увольнение
   panel.querySelectorAll('[data-fire-emp]').forEach(btn => {
     btn.addEventListener('click', () => {
+      audioManager.play('buttonClick');
       const empId = btn.dataset.fireEmp;
       const emp = gameState.employees.find(e => e.id === empId);
       if (emp && confirm(`Уволить сотрудника ${emp.name}?`)) {

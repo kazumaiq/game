@@ -12,6 +12,7 @@ import { showWashProgress, hideWashProgress } from '../../ui/WashProgressUI.js';
 import { showToast } from '../../ui/ToastUI.js';
 import { StorySystem } from '../systems/StorySystem.js';
 import { tutorialSystem, TutorialSystem } from '../systems/TutorialSystem.js';
+import { audioManager } from '../systems/AudioManager.js';
 
 const WORLD = {
   width: 900,
@@ -49,6 +50,7 @@ export default class CarWashScene extends Phaser.Scene {
     this._spawnTimer = 0;
     this._shiftTimer = 0;
     this._employeeTimers = {};
+    this._employeeSprites = {};
     this._walkAnimTimer = 0;
     this._walkFrame = 0;
 
@@ -518,6 +520,7 @@ export default class CarWashScene extends Phaser.Scene {
     if (gameState.paused || !gameState.shiftActive) return;
 
     if (this._isWashing) {
+      audioManager.play('waterSpray');
       this._advanceWashStage();
       return;
     }
@@ -529,6 +532,7 @@ export default class CarWashScene extends Phaser.Scene {
         const pos = WORLD.posts[i];
         const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, pos.x, pos.y);
         if (dist < 100) {
+          audioManager.play('wrenchRepair');
           this.player.setTexture('player_repair');
           this._spawnRepairSparks(pos.x, pos.y);
           this.time.delayedCall(450, () => {
@@ -538,10 +542,12 @@ export default class CarWashScene extends Phaser.Scene {
           });
           const result = gameState.repairPost(post.id);
           if (result.success) {
+            audioManager.play('success');
             this._postSprites[i].setTexture('wash_bay_normal');
             showToast('Бокс успешно отремонтирован!', 'success');
             this._updatePostStatuses();
           } else {
+            audioManager.play('error');
             showToast(result.reason, 'warning');
           }
           return;
@@ -584,6 +590,7 @@ export default class CarWashScene extends Phaser.Scene {
     car.washStage = 0;
     car.washProgress = 0;
 
+    audioManager.play('waterSpray');
     this.player.setTexture('player_work');
 
     const stages = BALANCE.services.expressWash.stages;
@@ -603,6 +610,9 @@ export default class CarWashScene extends Phaser.Scene {
     }
 
     const stages = BALANCE.services.expressWash.stages;
+    const isFoam = stages[car.washStage] === 'foam';
+    audioManager.play(isFoam ? 'foamSpray' : 'rinse');
+
     if (car.washProgress < 100) {
       car.washProgress += 25;
       if (car.washProgress > 100) car.washProgress = 100;
@@ -613,7 +623,6 @@ export default class CarWashScene extends Phaser.Scene {
 
       const sprite = this._carSprites[car.id];
       if (sprite) {
-        const isFoam = stages[car.washStage] === 'foam';
         this._spawnSplashBurst(sprite.x, sprite.y, isFoam);
       }
 
@@ -649,6 +658,7 @@ export default class CarWashScene extends Phaser.Scene {
     car.state = 'done';
     car.completed = true;
 
+    audioManager.play('cashRegister');
     const profit = gameState.addServiceIncome(car.id, quality);
     hideWashProgress();
     this._isWashing = false;
@@ -690,6 +700,7 @@ export default class CarWashScene extends Phaser.Scene {
     if (Math.random() < chance) {
       const idx = gameState.posts.findIndex(p => p.id === postId);
       if (idx !== -1) {
+        audioManager.play('warningBeep');
         gameState.breakPost(postId);
         this._postSprites[idx].setTexture('wash_bay_broken');
         showToast(`${WORLD.posts[idx].label} вышел из строя! Подойди для починки.`, 'warning');
@@ -700,6 +711,7 @@ export default class CarWashScene extends Phaser.Scene {
   _carLeave(carId) {
     const sprite = this._carSprites[carId];
     if (sprite) {
+      audioManager.play('carDepart');
       this.tweens.add({
         targets: sprite,
         x: WORLD.exit.x + 80,
@@ -731,7 +743,7 @@ export default class CarWashScene extends Phaser.Scene {
     if (gameState.cars.length >= BALANCE.customer.maxActiveCars) return;
 
     const classes = Object.keys(BALANCE.carClasses);
-    const weights = [0.35, 0.35, 0.2, 0.1];
+    const weights = [0.25, 0.25, 0.18, 0.12, 0.12, 0.08];
     let r = Math.random();
     let classId = classes[0];
     for (let i = 0; i < weights.length; i++) {
@@ -742,6 +754,7 @@ export default class CarWashScene extends Phaser.Scene {
     const car = gameState.addCar(classId);
     if (!car) return;
 
+    audioManager.play('carArrive');
     const queueIndex = gameState.queue.indexOf(car.id);
     const targetX = WORLD.queueStart.x + queueIndex * WORLD.queueSpacing;
     const targetY = WORLD.queueStart.y;
@@ -847,9 +860,56 @@ export default class CarWashScene extends Phaser.Scene {
   }
 
   _processEmployees(delta) {
+    // 1. Создание спрайтов для нанятых сотрудников
+    for (let i = 0; i < gameState.employees.length; i++) {
+      const emp = gameState.employees[i];
+      if (!this._employeeSprites[emp.id]) {
+        this._spawnEmployeeSprite(emp, i);
+      }
+    }
+
+    // 2. Удаление спрайтов уволенных сотрудников
+    for (const empId of Object.keys(this._employeeSprites)) {
+      if (!gameState.employees.some(e => e.id === empId)) {
+        const data = this._employeeSprites[empId];
+        if (data && data.sprite && data.sprite.active) {
+          data.sprite.setTexture('employee_walk_1');
+          if (data.label) data.label.destroy();
+          this.tweens.add({
+            targets: data.sprite,
+            x: WORLD.exit.x + 40,
+            y: WORLD.roadY,
+            alpha: 0,
+            duration: 1100,
+            ease: 'Power2',
+            onComplete: () => {
+              data.sprite.destroy();
+            },
+          });
+        }
+        delete this._employeeSprites[empId];
+      }
+    }
+
+    // 3. Распределение задач для свободных сотрудников
     for (const emp of gameState.employees) {
       if (emp.status !== 'idle') continue;
 
+      // Сначала проверка: есть ли сломанный бокс для ремонта техником?
+      let foundTask = false;
+      for (let i = 0; i < gameState.posts.length; i++) {
+        const post = gameState.posts[i];
+        if (post.broken && !this._isEmployeeRepairing(post.id)) {
+          emp.status = 'repairing';
+          emp.assignedPost = post.id;
+          this._startEmployeeRepair(emp, i);
+          foundTask = true;
+          break;
+        }
+      }
+      if (foundTask) continue;
+
+      // Затем проверка: есть ли машина на мойке в свободном боксе?
       for (let i = 0; i < gameState.posts.length; i++) {
         const post = gameState.posts[i];
         if (post.busy && post.carId && !post.broken) {
@@ -859,7 +919,7 @@ export default class CarWashScene extends Phaser.Scene {
             emp.status = 'working';
             emp.assignedPost = post.id;
             emp.assignedCar = car.id;
-            this._startEmployeeWash(emp, car);
+            this._startEmployeeWash(emp, car, i);
             break;
           }
         }
@@ -871,10 +931,121 @@ export default class CarWashScene extends Phaser.Scene {
     return gameState.employees.some(e => e.assignedPost === postId && e.status === 'working');
   }
 
-  _startEmployeeWash(emp, car) {
+  _isEmployeeRepairing(postId) {
+    return gameState.employees.some(e => e.assignedPost === postId && e.status === 'repairing');
+  }
+
+  _getEmployeeRestPos(empId) {
+    const idx = gameState.employees.findIndex(e => e.id === empId);
+    const safeIdx = idx >= 0 ? idx : 0;
+    return {
+      x: WORLD.building.x - 70 + (safeIdx * 45),
+      y: WORLD.building.y + 75,
+    };
+  }
+
+  _spawnEmployeeSprite(emp, index) {
+    const rest = this._getEmployeeRestPos(emp.id);
+    const sprite = this.add.image(rest.x, rest.y, 'employee_idle').setDepth(14);
+
+    const label = this.add.text(rest.x, rest.y - 32, emp.name, {
+      fontSize: '10px',
+      color: '#fef08a',
+      fontStyle: 'bold',
+      fontFamily: 'system-ui, sans-serif',
+      backgroundColor: 'rgba(15, 23, 42, 0.85)',
+      padding: { x: 5, y: 2 },
+    }).setOrigin(0.5).setDepth(15);
+
+    this._employeeSprites[emp.id] = { sprite, label, emp };
+  }
+
+  _startEmployeeRepair(emp, bayIndex) {
+    const data = this._employeeSprites[emp.id];
+    const postPos = WORLD.posts[bayIndex];
+    const targetX = postPos.x - 30;
+    const targetY = postPos.y + 16;
+
+    if (data && data.sprite) {
+      data.sprite.setTexture('employee_walk_1');
+      this.tweens.add({
+        targets: data.sprite,
+        x: targetX,
+        y: targetY,
+        duration: 700,
+        ease: 'Power1',
+        onComplete: () => {
+          if (this._destroyed || !data.sprite.active) return;
+          data.sprite.setTexture('employee_repair');
+          this._spawnRepairSparks(targetX, targetY);
+          audioManager.play('wrenchRepair');
+
+          this.time.delayedCall(2200, () => {
+            if (this._destroyed) return;
+            const post = gameState.posts[bayIndex];
+            if (post && post.broken) {
+              const res = gameState.repairPost(post.id);
+              if (res.success) {
+                this._postSprites[bayIndex].setTexture('wash_bay_normal');
+                showToast(`${emp.name} починил ${WORLD.posts[bayIndex].label}!`, 'success');
+                audioManager.play('success');
+                this._updatePostStatuses();
+              }
+            }
+            emp.status = 'idle';
+            emp.assignedPost = null;
+            this._returnEmployeeToRest(emp);
+          });
+        },
+      });
+    }
+  }
+
+  _returnEmployeeToRest(emp) {
+    const data = this._employeeSprites[emp.id];
+    if (!data || !data.sprite || !data.sprite.active) return;
+    const rest = this._getEmployeeRestPos(emp.id);
+
+    data.sprite.setTexture('employee_walk_2');
+    this.tweens.add({
+      targets: data.sprite,
+      x: rest.x,
+      y: rest.y,
+      duration: 800,
+      ease: 'Power1',
+      onComplete: () => {
+        if (data.sprite.active) {
+          data.sprite.setTexture('employee_idle');
+        }
+      },
+    });
+  }
+
+  _startEmployeeWash(emp, car, bayIndex) {
     const stages = BALANCE.services.expressWash.stages;
     car.washStage = 0;
     car.washProgress = 0;
+
+    const postPos = WORLD.posts[bayIndex];
+    const targetX = postPos.x - 32;
+    const targetY = postPos.y + 14;
+
+    const empData = this._employeeSprites[emp.id];
+    if (empData && empData.sprite) {
+      empData.sprite.setTexture('employee_walk_1');
+      this.tweens.add({
+        targets: empData.sprite,
+        x: targetX,
+        y: targetY,
+        duration: 650,
+        ease: 'Power1',
+        onComplete: () => {
+          if (empData.sprite.active) {
+            empData.sprite.setTexture('employee_work');
+          }
+        },
+      });
+    }
 
     const speedMult = gameState.getUpgradeEffect('washSpeed', 1);
     const carClass = BALANCE.carClasses[car.carClass];
@@ -891,12 +1062,20 @@ export default class CarWashScene extends Phaser.Scene {
         emp.status = 'idle';
         emp.assignedPost = null;
         emp.assignedCar = null;
+        this._returnEmployeeToRest(emp);
         return;
       }
 
       freshCar.washStage = currentStage;
       freshCar.washProgress = 100;
       this._updateCarVisual(freshCar);
+
+      const sprite = this._carSprites[freshCar.id];
+      if (sprite) {
+        const isFoam = stages[currentStage] === 'foam';
+        this._spawnSplashBurst(sprite.x, sprite.y, isFoam);
+        audioManager.play(isFoam ? 'foamSpray' : 'rinse');
+      }
 
       currentStage++;
       if (currentStage >= stages.length) {
@@ -905,7 +1084,8 @@ export default class CarWashScene extends Phaser.Scene {
         freshCar.quality = quality;
         freshCar.state = 'done';
         freshCar.completed = true;
-        gameState.addServiceIncome(freshCar.id, quality);
+        const profit = gameState.addServiceIncome(freshCar.id, quality);
+        audioManager.play('cashRegister');
         this._updateCarVisual(freshCar);
 
         this.time.delayedCall(1400, () => {
@@ -917,6 +1097,7 @@ export default class CarWashScene extends Phaser.Scene {
         emp.status = 'idle';
         emp.assignedPost = null;
         emp.assignedCar = null;
+        this._returnEmployeeToRest(emp);
         updateHUD();
       } else {
         this._employeeTimers[emp.id] = this.time.delayedCall(stageTime, advanceStage);
@@ -1026,6 +1207,16 @@ export default class CarWashScene extends Phaser.Scene {
         sprite.setDepth(10 + sprite.y * 0.01);
       }
     }
+    for (const empId of Object.keys(this._employeeSprites)) {
+      const data = this._employeeSprites[empId];
+      if (data && data.sprite && data.sprite.active) {
+        data.sprite.setDepth(14 + data.sprite.y * 0.01);
+        if (data.label && data.label.active) {
+          data.label.setDepth(16 + data.sprite.y * 0.01);
+          data.label.setPosition(data.sprite.x, data.sprite.y - 32);
+        }
+      }
+    }
   }
 
   endShift() {
@@ -1045,6 +1236,18 @@ export default class CarWashScene extends Phaser.Scene {
       emp.status = 'idle';
       emp.assignedPost = null;
       emp.assignedCar = null;
+    }
+
+    for (const empId of Object.keys(this._employeeSprites)) {
+      const data = this._employeeSprites[empId];
+      if (data && data.sprite && data.sprite.active) {
+        data.sprite.setTexture('employee_idle');
+        const rest = this._getEmployeeRestPos(empId);
+        data.sprite.setPosition(rest.x, rest.y);
+        if (data.label && data.label.active) {
+          data.label.setPosition(rest.x, rest.y - 32);
+        }
+      }
     }
 
     const remainingCars = [...gameState.cars];
@@ -1283,6 +1486,15 @@ export default class CarWashScene extends Phaser.Scene {
       this._touchControlsRoot.remove();
       this._touchControlsRoot = null;
     }
+
+    for (const empId of Object.keys(this._employeeSprites)) {
+      const data = this._employeeSprites[empId];
+      if (data) {
+        if (data.sprite) data.sprite.destroy();
+        if (data.label) data.label.destroy();
+      }
+    }
+    this._employeeSprites = {};
 
     for (const timerId of Object.keys(this._employeeTimers)) {
       if (this._employeeTimers[timerId]) {

@@ -7,6 +7,7 @@ import BALANCE from '../game/config/balance.js';
 import { showBusinessPanel } from './BusinessPanelUI.js';
 import { showUpgradePanel } from './UpgradePanelUI.js';
 import { showToast } from './ToastUI.js';
+import { audioManager } from '../game/systems/AudioManager.js';
 
 let _hudElement = null;
 let _scene = null;
@@ -74,10 +75,17 @@ export function createHUD(scene) {
   overlay.appendChild(hud);
   _hudElement = hud;
 
-  document.getElementById('hud-btn-business').addEventListener('click', () => showBusinessPanel());
-  document.getElementById('hud-btn-upgrades').addEventListener('click', () => showUpgradePanel());
+  document.getElementById('hud-btn-business').addEventListener('click', () => {
+    audioManager.play('buttonClick');
+    showBusinessPanel();
+  });
+  document.getElementById('hud-btn-upgrades').addEventListener('click', () => {
+    audioManager.play('buttonClick');
+    showUpgradePanel();
+  });
   
   document.getElementById('hud-btn-pause').addEventListener('click', () => {
+    audioManager.play('buttonClick');
     gameState.paused = !gameState.paused;
     const btn = document.getElementById('hud-btn-pause');
     if (gameState.paused) {
@@ -92,6 +100,7 @@ export function createHUD(scene) {
   });
 
   document.getElementById('hud-btn-end-shift').addEventListener('click', () => {
+    audioManager.play('buttonClick');
     if (confirm('Завершить текущую рабочую смену? Оставшиеся в очереди машины уедут.')) {
       _scene.endShift();
     }

@@ -20,7 +20,8 @@ export function createGame() {
     // Установка devicePixelRatio для четкого рендеринга на Retina / OLED экранах телефонов
     resolution: dpr,
     render: {
-      antialias: true,
+      antialias: false,
+      pixelArt: false,
       roundPixels: true,
       powerPreference: 'high-performance',
     },

@@ -44,6 +44,8 @@ html, body {
   display: block;
   width: 100% !important;
   height: 100% !important;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
 }
 
 #ui-overlay {

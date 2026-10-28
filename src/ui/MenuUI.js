@@ -6,6 +6,7 @@
  */
 import FullscreenManager from '../game/systems/FullscreenManager.js';
 import saveSystem from '../game/systems/SaveSystem.js';
+import { audioManager } from '../game/systems/AudioManager.js';
 
 let _menuElement = null;
 let _settingsModal = null;
@@ -61,6 +62,8 @@ export function showMenu({ hasSave, onNewGame, onContinue }) {
   document.getElementById('menu-new-game').addEventListener('click', () => {
     if (isTransitioning) return;
     isTransitioning = true;
+    audioManager.ensureContext();
+    audioManager.play('buttonClick');
     onNewGame();
     // Сбрасываем через 2 сек на случай если confirm отклонён
     setTimeout(() => { isTransitioning = false; }, 2000);
@@ -70,6 +73,8 @@ export function showMenu({ hasSave, onNewGame, onContinue }) {
     document.getElementById('menu-continue').addEventListener('click', () => {
       if (isTransitioning) return;
       isTransitioning = true;
+      audioManager.ensureContext();
+      audioManager.play('buttonClick');
       onContinue();
       setTimeout(() => { isTransitioning = false; }, 2000);
     });
@@ -133,9 +138,13 @@ function _showSettings() {
           <div class="settings-row">
             <span class="settings-desc">Звуковые эффекты</span>
             <label class="settings-toggle">
-              <input type="checkbox" id="settings-sfx" checked />
+              <input type="checkbox" id="settings-sfx" ${audioManager.sfxEnabled ? 'checked' : ''} />
               <span class="toggle-track"></span>
             </label>
+          </div>
+          <div class="settings-row">
+            <span class="settings-desc">Громкость</span>
+            <input type="range" id="settings-volume" min="0" max="100" value="${Math.round(audioManager.masterVolume * 100)}" style="width:90px;accent-color:#38bdf8;" />
           </div>
           <div class="settings-row">
             <span class="settings-desc">Музыка</span>
@@ -175,10 +184,33 @@ function _showSettings() {
   _settingsModal = backdrop;
 
   // Закрытие
-  document.getElementById('settings-close').addEventListener('click', _hideSettings);
+  document.getElementById('settings-close').addEventListener('click', () => {
+    audioManager.play('buttonClick');
+    _hideSettings();
+  });
   backdrop.addEventListener('click', (e) => {
     if (e.target === backdrop) _hideSettings();
   });
+
+  // Звуковые настройки
+  const sfxToggle = document.getElementById('settings-sfx');
+  if (sfxToggle) {
+    sfxToggle.addEventListener('change', () => {
+      audioManager.toggleSFX();
+      audioManager.play('buttonClick');
+    });
+  }
+
+  const volSlider = document.getElementById('settings-volume');
+  if (volSlider) {
+    volSlider.addEventListener('input', (e) => {
+      const vol = parseInt(e.target.value, 10) / 100;
+      audioManager.setVolume(vol);
+    });
+    volSlider.addEventListener('change', () => {
+      audioManager.play('buttonClick');
+    });
+  }
 
   // Сброс
   document.getElementById('settings-reset').addEventListener('click', () => {

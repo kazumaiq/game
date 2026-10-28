@@ -318,3 +318,73 @@ test('17. Проверка дистанции взаимодействия', () 
   assert.ok(closeDist < 100);
 });
 
+test('18. Поддержка всех 6 классов автомобилей (включая wagon и van)', () => {
+  const classes = Object.keys(BALANCE.carClasses);
+  assert.equal(classes.length, 6);
+  assert.ok(classes.includes('compact'));
+  assert.ok(classes.includes('sedan'));
+  assert.ok(classes.includes('suv'));
+  assert.ok(classes.includes('premium'));
+  assert.ok(classes.includes('wagon'));
+  assert.ok(classes.includes('van'));
+
+  gameState.initNewGame('roadside');
+  const wagon = gameState.addCar('wagon');
+  assert.ok(wagon);
+  assert.equal(wagon.carClass, 'wagon');
+
+  const van = gameState.addCar('van');
+  assert.ok(van);
+  assert.equal(van.carClass, 'van');
+});
+
+test('19. Управление сотрудниками: найм, статус, зарплата и увольнение', () => {
+  gameState.initNewGame('roadside');
+  assert.equal(gameState.employees.length, 0);
+
+  const hireRes = gameState.hireEmployee();
+  assert.equal(hireRes.success, true);
+  assert.equal(gameState.employees.length, 1);
+  const emp = gameState.employees[0];
+  assert.equal(emp.status, 'idle');
+
+  // Зарплата списывается при завершении дня
+  const moneyBefore = gameState.money;
+  gameState.applyDailyExpenses();
+  const expectedSalary = BALANCE.employee.dailySalary;
+  const locRent = gameState.getLocation().dailyRent;
+  const utilities = BALANCE.dailyCosts.utilities;
+  assert.equal(gameState.money, moneyBefore - locRent - utilities - expectedSalary);
+
+  // Увольнение
+  const fireRes = gameState.fireEmployee(emp.id);
+  assert.equal(fireRes, true);
+  assert.equal(gameState.employees.length, 0);
+});
+
+test('20. Безопасность AudioManager в Node/безголовом окружении', async () => {
+  const { audioManager } = await import('../src/game/systems/AudioManager.js');
+  assert.ok(audioManager);
+  assert.equal(typeof audioManager.play, 'function');
+  assert.equal(typeof audioManager.setVolume, 'function');
+  assert.equal(typeof audioManager.toggleSFX, 'function');
+
+  // Вызовы не должны выбрасывать исключений
+  assert.doesNotThrow(() => {
+    audioManager.play('buttonClick');
+    audioManager.play('waterSpray');
+    audioManager.play('foamSpray');
+    audioManager.play('rinse');
+    audioManager.play('cashRegister');
+    audioManager.play('warningBeep');
+    audioManager.play('wrenchRepair');
+    audioManager.play('carArrive');
+    audioManager.play('carDepart');
+    audioManager.play('success');
+    audioManager.play('error');
+    audioManager.setVolume(0.8);
+    audioManager.toggleSFX();
+  });
+});
+
+

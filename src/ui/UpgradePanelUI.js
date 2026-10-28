@@ -5,6 +5,7 @@ import gameState from '../game/systems/GameState.js';
 import BALANCE from '../game/config/balance.js';
 import { showToast } from './ToastUI.js';
 import { updateHUD } from './HudUI.js';
+import { audioManager } from '../game/systems/AudioManager.js';
 
 function fmt(n) {
   if (typeof n !== 'number' || !isFinite(n)) return '0 ₽';
@@ -61,7 +62,10 @@ export function showUpgradePanel() {
 
   overlay.appendChild(panel);
 
-  document.getElementById('upgrade-close').addEventListener('click', () => panel.remove());
+  document.getElementById('upgrade-close').addEventListener('click', () => {
+    audioManager.play('buttonClick');
+    panel.remove();
+  });
   panel.addEventListener('click', (e) => {
     if (e.target === panel) panel.remove();
   });
@@ -71,11 +75,13 @@ export function showUpgradePanel() {
       const id = btn.dataset.buyUpgrade;
       const res = gameState.buyUpgrade(id);
       if (res.success) {
+        audioManager.play('cashRegister');
         showToast(`Улучшение куплено! Новый уровень: ${res.newLevel}`, 'success');
         panel.remove();
         showUpgradePanel();
         updateHUD();
       } else {
+        audioManager.play('error');
         showToast(res.reason, 'warning');
       }
     });

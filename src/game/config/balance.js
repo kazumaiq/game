@@ -187,6 +187,24 @@ export const BALANCE = {
       color: 0xf39c12,
       width: 44, height: 24,
     },
+    wagon: {
+      id: 'wagon',
+      name: 'Универсал',
+      timeMultiplier: 1.2,
+      supplyCostMultiplier: 1.1,
+      priceMultiplier: 1.1,
+      color: 0x2ecc71,
+      width: 40, height: 24,
+    },
+    van: {
+      id: 'van',
+      name: 'Фургон',
+      timeMultiplier: 1.6,
+      supplyCostMultiplier: 1.4,
+      priceMultiplier: 1.5,
+      color: 0xe74c3c,
+      width: 46, height: 28,
+    },
   },
 
   // Клиенты
