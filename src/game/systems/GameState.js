@@ -67,6 +67,7 @@ class GameState {
     this.storyFlags = {};
     this.tutorialCompleted = false;
     this.tutorialStep = 0;
+    this.tutorialCarId = null;
 
     this.marketingActive = false;
     this.marketingDaysLeft = 0;
@@ -467,6 +468,27 @@ class GameState {
     return !!this.storyFlags[flag];
   }
 
+  advanceTutorial(expectedCurrentStep) {
+    if (this.tutorialCompleted) return false;
+    if (expectedCurrentStep !== undefined && this.tutorialStep !== expectedCurrentStep) return false;
+    this.tutorialStep++;
+    this.emit('stateChanged');
+    this.emit('tutorialStepChanged', this.tutorialStep);
+    return true;
+  }
+
+  completeTutorial() {
+    this.tutorialCompleted = true;
+    this.tutorialStep = 4;
+    this.emit('stateChanged');
+    this.emit('tutorialCompleted');
+    return true;
+  }
+
+  isTutorialActive() {
+    return !this.tutorialCompleted;
+  }
+
   breakPost(postId) {
     const post = this.posts.find(p => p.id === postId);
     if (!post || post.broken) return false;
@@ -552,6 +574,7 @@ class GameState {
       storyFlags: { ...this.storyFlags },
       tutorialCompleted: this.tutorialCompleted,
       tutorialStep: this.tutorialStep,
+      tutorialCarId: this.tutorialCarId,
       marketingActive: this.marketingActive,
       marketingDaysLeft: this.marketingDaysLeft,
       loyaltyActive: this.loyaltyActive,
@@ -602,7 +625,8 @@ class GameState {
     if (data.storyFlags) this.storyFlags = { ...data.storyFlags };
 
     this.tutorialCompleted = !!data.tutorialCompleted;
-    this.tutorialStep = data.tutorialStep || 0;
+    this.tutorialStep = typeof data.tutorialStep === 'number' ? data.tutorialStep : 0;
+    this.tutorialCarId = data.tutorialCarId || null;
     this.marketingActive = !!data.marketingActive;
     this.marketingDaysLeft = data.marketingDaysLeft || 0;
     this.loyaltyActive = !!data.loyaltyActive;

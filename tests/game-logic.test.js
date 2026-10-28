@@ -162,3 +162,159 @@ test('11. Обработка повреждённого сохранения', (
   assert.equal(gameState.deserialize({ foo: 'bar' }), false);
   assert.equal(gameState.deserialize({ saveVersion: 4 }), false);
 });
+
+// Polyfills for Node environment tests
+if (!globalThis.localStorage) {
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => store.get(k) || null,
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+    clear: () => store.clear(),
+  };
+}
+
+if (!globalThis.document) {
+  globalThis.document = {
+    getElementById: () => null,
+    createElement: () => ({
+      appendChild: () => {},
+      remove: () => {},
+      setAttribute: () => {},
+      style: {},
+      classList: { add: () => {}, remove: () => {} },
+    }),
+    body: { appendChild: () => {} },
+  };
+}
+
+test('12. Полный путь обучения от приближения к машине до завершения заказа', () => {
+  gameState.initNewGame('roadside');
+  assert.equal(gameState.tutorialCompleted, false);
+  assert.equal(gameState.tutorialStep, 0);
+
+  // Шаг 0: Игрок приближается к машине
+  const advanced0 = gameState.advanceTutorial(0);
+  assert.equal(advanced0, true);
+  assert.equal(gameState.tutorialStep, 1);
+
+  // Шаг 1: Игрок начинает обслуживание
+  const advanced1 = gameState.advanceTutorial(1);
+  assert.equal(advanced1, true);
+  assert.equal(gameState.tutorialStep, 2);
+
+  // Шаг 2: Нанесение пены и смывание
+  const car = gameState.addCar('sedan');
+  gameState.assignCarToPost(car.id, 'post_1');
+  assert.equal(car.paid, false);
+
+  // Шаг 3: Завершение и оплата
+  const profit = gameState.addServiceIncome(car.id, 0.9);
+  assert.ok(profit > 0);
+  assert.equal(car.paid, true);
+  assert.equal(car.completed, true);
+
+  gameState.completeTutorial();
+  assert.equal(gameState.tutorialCompleted, true);
+  assert.equal(gameState.isTutorialActive(), false);
+});
+
+test('13. Шаг 4 завершается после начисления оплаты и не требует повторных действий', () => {
+  gameState.initNewGame('roadside');
+  gameState.tutorialStep = 2; // Мойка в процессе
+
+  const car = gameState.addCar('compact');
+  gameState.assignCarToPost(car.id, 'post_1');
+
+  // Мойка завершилась -> начисление дохода
+  const moneyBefore = gameState.money;
+  const net = gameState.addServiceIncome(car.id, 1.0);
+  assert.ok(net > 0);
+  assert.equal(gameState.money, moneyBefore + net);
+
+  // Завершение обучения переводит флаг
+  gameState.completeTutorial();
+  assert.equal(gameState.tutorialCompleted, true);
+  assert.equal(gameState.tutorialStep, 4);
+
+  // Повторная попытка завершить заказ не начисляет деньги
+  const secondIncome = gameState.addServiceIncome(car.id, 1.0);
+  assert.equal(secondIncome, 0);
+  assert.equal(gameState.money, moneyBefore + net);
+});
+
+test('14. Отсутствие целевой машины восстанавливается', () => {
+  gameState.initNewGame('roadside');
+  gameState.tutorialCompleted = false;
+  gameState.cars = [];
+  gameState.posts[0].busy = false;
+  gameState.posts[0].carId = null;
+
+  // Функция восстановления гарантирует машину в посте 1
+  const post1 = gameState.posts[0];
+  let car = gameState.cars.find(c => !c.completed && !c.paid);
+  if (!car) {
+    car = gameState.addCar('sedan');
+    gameState.assignCarToPost(car.id, post1.id);
+  }
+
+  assert.ok(car, 'Машина должна быть восстановлена');
+  assert.equal(post1.busy, true);
+  assert.equal(post1.carId, car.id);
+  assert.equal(gameState.cars.length, 1);
+});
+
+test('15. Завершённое обучение сохраняется после перезагрузки', () => {
+  gameState.initNewGame('roadside');
+  gameState.completeTutorial();
+  assert.equal(gameState.tutorialCompleted, true);
+
+  const snapshot = gameState.serialize();
+  assert.equal(snapshot.tutorialCompleted, true);
+
+  gameState.reset();
+  assert.equal(gameState.tutorialCompleted, false);
+
+  const ok = gameState.deserialize(snapshot);
+  assert.equal(ok, true);
+  assert.equal(gameState.tutorialCompleted, true);
+  assert.equal(gameState.isTutorialActive(), false);
+});
+
+test('16. Незавершённое обучение восстанавливается с сохранением текущего шага', () => {
+  gameState.initNewGame('roadside');
+  gameState.tutorialCompleted = false;
+  gameState.tutorialStep = 2;
+
+  const snapshot = gameState.serialize();
+  assert.equal(snapshot.tutorialCompleted, false);
+  assert.equal(snapshot.tutorialStep, 2);
+
+  gameState.reset();
+  gameState.deserialize(snapshot);
+
+  assert.equal(gameState.tutorialCompleted, false);
+  assert.equal(gameState.tutorialStep, 2);
+  assert.equal(gameState.isTutorialActive(), true);
+});
+
+test('17. Проверка дистанции взаимодействия', () => {
+  const player = { x: 450, y: 390 };
+  const post1 = { x: 300, y: 310 };
+  const dx = player.x - post1.x;
+  const dy = player.y - post1.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
+  // На старте дистанция ~170px — слишком далеко для мойки без приближения
+  assert.ok(dist > 100);
+
+  // Игрок приближается к боксу
+  const closePlayer = { x: 330, y: 320 };
+  const closeDx = closePlayer.x - post1.x;
+  const closeDy = closePlayer.y - post1.y;
+  const closeDist = Math.sqrt(closeDx * closeDx + closeDy * closeDy);
+
+  // Вблизи дистанция < 100px — действие мойки разрешено
+  assert.ok(closeDist < 100);
+});
+

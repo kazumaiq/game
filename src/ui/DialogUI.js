@@ -8,7 +8,7 @@ export function showDialog({ speaker, text, choices }) {
   hideDialog();
 
   // При открытии диалога временно скрываем плашку туториала, чтобы они никогда не накладывались
-  const tutorialEl = document.getElementById('tutorial-overlay');
+  const tutorialEl = document.getElementById('tutorial-badge-overlay');
   if (tutorialEl) {
     tutorialEl.style.display = 'none';
   }
@@ -60,7 +60,7 @@ export function hideDialog() {
   if (existing) existing.remove();
 
   // Восстанавливаем показ туториала
-  const tutorialEl = document.getElementById('tutorial-overlay');
+  const tutorialEl = document.getElementById('tutorial-badge-overlay');
   if (tutorialEl) {
     tutorialEl.style.display = 'flex';
   }

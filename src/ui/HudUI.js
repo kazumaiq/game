@@ -67,6 +67,9 @@ export function createHUD(scene) {
     <div class="shift-timeline-bar">
       <div class="shift-timeline-fill" id="hud-shift-fill" style="width: 100%;"></div>
     </div>
+
+    <!-- Слот для учебных подсказок (не перекрывает кнопки и сцену) -->
+    <div id="tutorial-slot" class="hud-tutorial-slot"></div>
   `;
   overlay.appendChild(hud);
   _hudElement = hud;

@@ -11,7 +11,7 @@ import { createHUD, updateHUD, destroyHUD } from '../../ui/HudUI.js';
 import { showWashProgress, hideWashProgress } from '../../ui/WashProgressUI.js';
 import { showToast } from '../../ui/ToastUI.js';
 import { StorySystem } from '../systems/StorySystem.js';
-import { TutorialSystem } from '../systems/TutorialSystem.js';
+import { tutorialSystem, TutorialSystem } from '../systems/TutorialSystem.js';
 
 const WORLD = {
   width: 900,
@@ -54,10 +54,10 @@ export default class CarWashScene extends Phaser.Scene {
 
     // Графический маркер подсветки целевой машины во время обучения
     this._targetHighlight = this.add.graphics();
-    this._targetHighlight.setDepth(11);
+    this._targetHighlight.setDepth(18);
 
     this._storySystem = new StorySystem();
-    this._tutorialSystem = new TutorialSystem();
+    this._tutorialSystem = tutorialSystem;
 
     createHUD(this);
     saveSystem.startAutoSave();
@@ -68,7 +68,7 @@ export default class CarWashScene extends Phaser.Scene {
     this._storySystem.checkEvents(this);
 
     if (!gameState.tutorialCompleted) {
-      this._tutorialSystem.start();
+      this._tutorialSystem.start(this);
     }
 
     this._onStateChanged = () => updateHUD();
@@ -77,22 +77,15 @@ export default class CarWashScene extends Phaser.Scene {
     this.scale.on('resize', this._handleResize, this);
     this._handleResize({ width: this.scale.width, height: this.scale.height });
 
+    this._isCameraFollowingPlayer = false;
+    this._updateCameraTracking(true);
+
     updateHUD();
   }
 
   /** Гарантированное размещение первой обучающей машины в боксе 1 */
   _ensureInitialCar() {
-    const post1 = gameState.posts[0];
-    if (!post1.busy && gameState.cars.length === 0) {
-      const car = gameState.addCar('sedan');
-      if (car) {
-        gameState.assignCarToPost(car.id, post1.id);
-        const pos = WORLD.posts[0];
-        const sprite = this.add.image(pos.x, pos.y + 12, 'car_sedan_dirty');
-        sprite.setDepth(10);
-        this._carSprites[car.id] = sprite;
-      }
-    }
+    this._tutorialSystem.ensureTargetCar(this);
   }
 
   _handleResize(gameSize) {
@@ -100,14 +93,15 @@ export default class CarWashScene extends Phaser.Scene {
     const height = gameSize.height;
 
     const minDim = Math.min(width, height);
-    let targetZoom = 1.25;
+    let targetZoom = 1.15;
     if (minDim < 420) {
-      targetZoom = 1.0;
+      targetZoom = 0.95;
     } else if (minDim < 650) {
-      targetZoom = 1.15;
+      targetZoom = 1.05;
     }
 
     this.cameras.main.setZoom(targetZoom);
+    this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
   }
 
   _createEnvironment() {
@@ -192,7 +186,43 @@ export default class CarWashScene extends Phaser.Scene {
     this.player.body.setSize(24, 28);
     this.player.body.setOffset(9, 16);
 
-    this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+    if (gameState.tutorialCompleted) {
+      this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+      this._isCameraFollowingPlayer = true;
+    }
+  }
+
+  _updateCameraTracking(immediate = false) {
+    const cam = this.cameras.main;
+    if (gameState.tutorialCompleted) {
+      if (!this._isCameraFollowingPlayer && this.player) {
+        this._isCameraFollowingPlayer = true;
+        cam.startFollow(this.player, true, 0.1, 0.1);
+      }
+      return;
+    }
+
+    this._isCameraFollowingPlayer = false;
+    cam.stopFollow();
+
+    const post1 = WORLD.posts[0];
+    let targetX = (this.player.x + post1.x) * 0.5;
+    let targetY = (this.player.y + post1.y) * 0.5;
+
+    if (this._isWashing) {
+      targetX = post1.x;
+      targetY = post1.y + 10;
+    }
+
+    if (immediate) {
+      cam.centerOn(targetX, targetY);
+    } else {
+      const currentCenterX = cam.scrollX + (cam.width * 0.5) / cam.zoom;
+      const currentCenterY = cam.scrollY + (cam.height * 0.5) / cam.zoom;
+      const newX = Phaser.Math.Linear(currentCenterX, targetX, 0.08);
+      const newY = Phaser.Math.Linear(currentCenterY, targetY, 0.08);
+      cam.centerOn(newX, newY);
+    }
   }
 
   _setupControls() {
@@ -365,15 +395,32 @@ export default class CarWashScene extends Phaser.Scene {
       const carSprite = this._carSprites[post1.carId];
       if (carSprite && carSprite.active) {
         const time = this.time.now * 0.005;
-        const alpha = 0.5 + Math.sin(time) * 0.3;
+        const alpha = 0.6 + Math.sin(time) * 0.35;
+
+        // 1. Неоновая рамка вокруг целевой машины
         this._targetHighlight.lineStyle(3, 0x00d2d3, alpha);
         this._targetHighlight.strokeRoundedRect(
-          carSprite.x - carSprite.width / 2 - 4,
-          carSprite.y - carSprite.height / 2 - 4,
-          carSprite.width + 8,
-          carSprite.height + 8,
+          carSprite.x - carSprite.width / 2 - 6,
+          carSprite.y - carSprite.height / 2 - 6,
+          carSprite.width + 12,
+          carSprite.height + 12,
           8
         );
+
+        // 2. Анимированная стрелка над машиной
+        const arrowY = carSprite.y - carSprite.height / 2 - 16 + Math.sin(time * 1.6) * 5;
+        this._targetHighlight.fillStyle(0x00d2d3, 0.95);
+        this._targetHighlight.fillTriangle(
+          carSprite.x, arrowY + 8,
+          carSprite.x - 7, arrowY,
+          carSprite.x + 7, arrowY
+        );
+
+        // 3. Подложка бейджа «ЦЕЛЬ: БОКС 1»
+        this._targetHighlight.fillStyle(0x0f172a, 0.9);
+        this._targetHighlight.fillRoundedRect(carSprite.x - 48, arrowY - 20, 96, 18, 4);
+        this._targetHighlight.lineStyle(1, 0x00d2d3, 0.7);
+        this._targetHighlight.strokeRoundedRect(carSprite.x - 48, arrowY - 20, 96, 18, 4);
       }
     }
   }
@@ -447,8 +494,7 @@ export default class CarWashScene extends Phaser.Scene {
     showWashProgress(stageName, 0, 'Нажимай кнопку для нанесения пены!');
 
     if (!gameState.tutorialCompleted && gameState.tutorialStep === 1) {
-      gameState.tutorialStep = 2;
-      this._tutorialSystem.update();
+      this._tutorialSystem.advance(1);
     }
   }
 
@@ -515,9 +561,8 @@ export default class CarWashScene extends Phaser.Scene {
 
     this._checkBreakdown(car.postId);
 
-    if (!gameState.tutorialCompleted && gameState.tutorialStep === 2) {
-      gameState.tutorialStep = 3;
-      this._tutorialSystem.update();
+    if (!gameState.tutorialCompleted) {
+      this._tutorialSystem.complete(profit);
     }
 
     updateHUD();
@@ -812,9 +857,10 @@ export default class CarWashScene extends Phaser.Scene {
     this._shiftTimer += delta;
     gameState.shiftTimeRemaining = Math.max(0, BALANCE.time.shiftDurationMs - this._shiftTimer);
 
+    this._updateCameraTracking(false);
     this._updateDepth();
     this._updateActionBtnContext();
-    this._updateTargetHighlight();
+    this._updateTargetHighlight(time);
 
     if (Math.floor(time / 250) !== Math.floor((time - delta) / 250)) {
       updateHUD();
@@ -852,17 +898,11 @@ export default class CarWashScene extends Phaser.Scene {
 
     this.player.setVelocity(vx, vy);
 
-    if (!gameState.tutorialCompleted && gameState.tutorialStep === 0 && len > 0) {
-      for (let i = 0; i < gameState.posts.length; i++) {
-        const post = gameState.posts[i];
-        if (post.busy && post.carId) {
-          const pos = WORLD.posts[i];
-          const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, pos.x, pos.y);
-          if (dist < 100) {
-            gameState.tutorialStep = 1;
-            this._tutorialSystem.update();
-          }
-        }
+    if (!gameState.tutorialCompleted && gameState.tutorialStep === 0) {
+      const pos = WORLD.posts[0];
+      const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, pos.x, pos.y);
+      if (dist < 115) {
+        this._tutorialSystem.advance(0);
       }
     }
   }
@@ -990,11 +1030,8 @@ export default class CarWashScene extends Phaser.Scene {
       this._startNextDay();
     });
 
-    if (!gameState.tutorialCompleted && gameState.tutorialStep === 3) {
-      gameState.tutorialCompleted = true;
-      gameState.tutorialStep = 4;
+    if (!gameState.tutorialCompleted) {
       this._tutorialSystem.complete();
-      saveSystem.save();
     }
   }
 
