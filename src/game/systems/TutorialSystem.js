@@ -1,34 +1,33 @@
 /**
- * TutorialSystem — интерактивное обучение в верхней части экрана (banner-style).
- * Не перекрывает сцену и диалоговые окна.
+ * TutorialSystem — пошаговое понятное обучение (Шаг 1 из 4 ... Шаг 4 из 4).
+ * Лаконичные подсказки, не перекрывающие игровое поле.
  */
 import gameState from './GameState.js';
 
 const TUTORIAL_STEPS = [
   {
     step: 0,
-    title: 'Шаг 1: Подойдите к посту',
-    text: 'Используйте джойстик (слева) или WASD, чтобы подойти к машине в боксе.',
+    badge: 'Шаг 1 из 4',
+    title: 'Подойди к машине',
+    text: 'Управляй джойстиком слева (или WASD на ПК) и подойди к автомобилю в боксе.',
   },
   {
     step: 1,
-    title: 'Шаг 2: Начните мойку',
-    text: 'Подойдите вплотную и нажмите большую кнопку «ДЕЙСТВИЕ» (или E на ПК).',
+    badge: 'Шаг 2 из 4',
+    title: 'Нажми «Начать мойку»',
+    text: 'Подойди вплотную к автомобилю и нажми большую круглую кнопку «ДЕЙСТВИЕ» справа.',
   },
   {
     step: 2,
-    title: 'Шаг 3: Пройдите этапы мойки',
-    text: 'Нажимайте кнопку действия для нанесения пены, смывания водой и сушки.',
+    badge: 'Шаг 3 из 4',
+    title: 'Нанеси пену и смой грязь',
+    text: 'Продолжай нажимать кнопку действия, чтобы пройти этапы: пена → смыв → сушка.',
   },
   {
     step: 3,
-    title: 'Шаг 4: Получите оплату',
-    text: 'Автомобиль вымыт и оплачен! Изучите вкладку 💼 «Бизнес» или ⚡ «Улучшения».',
-  },
-  {
-    step: 4,
-    title: 'Шаг 5: Завершите смену',
-    text: 'Когда будете готовы, нажмите «Смена ❯» в правом верхнем углу для подсчета прибыли.',
+    badge: 'Шаг 4 из 4',
+    title: 'Заверши мойку и получи оплату',
+    text: 'Машина помыта! Клиент рассчитается, а выручка поступит на твой счет.',
   },
 ];
 
@@ -59,14 +58,13 @@ export class TutorialSystem {
 
     const overlay = document.getElementById('ui-overlay');
     const div = document.createElement('div');
-    div.className = 'tutorial-overlay';
-    div.id = 'tutorial-overlay';
+    div.className = 'tutorial-badge-overlay';
+    div.id = 'tutorial-badge-overlay';
     div.innerHTML = `
-      <div class="tutorial-banner">
-        <div class="tutorial-step-tag">ОБУЧЕНИЕ</div>
-        <div class="tutorial-content">
-          <h4>${stepData.title}</h4>
-          <p>${stepData.text}</p>
+      <div class="tutorial-compact-pill">
+        <span class="step-num">${stepData.badge}</span>
+        <div class="step-desc">
+          <strong>${stepData.title}:</strong> ${stepData.text}
         </div>
       </div>
     `;
@@ -79,7 +77,7 @@ export class TutorialSystem {
       this._element.remove();
       this._element = null;
     }
-    const existing = document.getElementById('tutorial-overlay');
+    const existing = document.getElementById('tutorial-badge-overlay');
     if (existing) existing.remove();
   }
 
