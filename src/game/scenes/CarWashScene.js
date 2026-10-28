@@ -590,7 +590,7 @@ export default class CarWashScene extends Phaser.Scene {
     car.washStage = 0;
     car.washProgress = 0;
 
-    audioManager.play('waterSpray');
+    audioManager.startSpray('foam');
     this.player.setTexture('player_work');
 
     const stages = BALANCE.services.expressWash.stages;
@@ -611,6 +611,7 @@ export default class CarWashScene extends Phaser.Scene {
 
     const stages = BALANCE.services.expressWash.stages;
     const isFoam = stages[car.washStage] === 'foam';
+    audioManager.startSpray(isFoam ? 'foam' : 'water');
     audioManager.play(isFoam ? 'foamSpray' : 'rinse');
 
     if (car.washProgress < 100) {
@@ -658,6 +659,8 @@ export default class CarWashScene extends Phaser.Scene {
     car.state = 'done';
     car.completed = true;
 
+    audioManager.stopSpray();
+    if (this._sprayGfx) this._sprayGfx.clear();
     audioManager.play('cashRegister');
     const profit = gameState.addServiceIncome(car.id, quality);
     hideWashProgress();
@@ -687,6 +690,8 @@ export default class CarWashScene extends Phaser.Scene {
   }
 
   _stopWashing() {
+    audioManager.stopSpray();
+    if (this._sprayGfx) this._sprayGfx.clear();
     this._isWashing = false;
     this._washingCar = null;
     this.player.setTexture('player_idle');
@@ -1189,6 +1194,17 @@ export default class CarWashScene extends Phaser.Scene {
 
     this.player.setVelocity(vx, vy);
 
+    if (this._isWashing && this._washingCar) {
+      const sprite = this._carSprites[this._washingCar];
+      if (sprite) {
+        const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, sprite.x, sprite.y);
+        if (dist > 130) {
+          this._stopWashing();
+          showToast('Вы отошли от машины — мойка прервана', 'info');
+        }
+      }
+    }
+
     if (!gameState.tutorialCompleted && gameState.tutorialStep === 0) {
       const pos = WORLD.posts[0];
       const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, pos.x, pos.y);
@@ -1468,6 +1484,8 @@ export default class CarWashScene extends Phaser.Scene {
 
   shutdown() {
     this._destroyed = true;
+    this._stopWashing();
+    audioManager.stopSpray();
     this.scale.off('resize', this._handleResize, this);
     saveSystem.stopAutoSave();
     gameState.off('stateChanged', this._onStateChanged);

@@ -12,6 +12,8 @@ class AudioManager {
     this.masterVolume = 0.5;
     this.sfxEnabled = true;
     this._initialized = false;
+    this._activeSpray = null;
+    this._lastPlayTimes = {};
 
     // Восстанавливаем настройки из localStorage если есть
     try {
@@ -82,6 +84,13 @@ class AudioManager {
     this.ensureContext();
     if (!this.ctx || !this.masterGain) return;
 
+    // Защита от спама звуками (не чаще одного раза в 70мс для одинакового звука)
+    const now = Date.now();
+    if (this._lastPlayTimes[soundName] && now - this._lastPlayTimes[soundName] < 70) {
+      return;
+    }
+    this._lastPlayTimes[soundName] = now;
+
     try {
       switch (soundName) {
         case 'buttonClick':
@@ -123,6 +132,70 @@ class AudioManager {
     } catch (e) {
       // Аудио не должно ломать логику игры
     }
+  }
+
+  /** Запуск непрерывного звука струи мойки (пена или вода) */
+  startSpray(type = 'water') {
+    if (!this.sfxEnabled || this.masterVolume <= 0) return;
+    this.ensureContext();
+    if (!this.ctx || !this.masterGain) return;
+
+    const freq = type === 'foam' ? 750 : 1350;
+    const q = type === 'foam' ? 1.2 : 1.9;
+
+    // Если струя уже играет, просто плавно модулируем фильтр
+    if (this._activeSpray) {
+      try {
+        this._activeSpray.filter.frequency.setTargetAtTime(freq, this.ctx.currentTime, 0.08);
+        this._activeSpray.filter.Q.setTargetAtTime(q, this.ctx.currentTime, 0.08);
+      } catch (e) {}
+      return;
+    }
+
+    try {
+      const bufferSize = Math.floor(this.ctx.sampleRate * 1.0);
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const output = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
+      noise.loop = true;
+
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(freq, this.ctx.currentTime);
+      filter.Q.setValueAtTime(q, this.ctx.currentTime);
+
+      const gain = this.ctx.createGain();
+      const t = this.ctx.currentTime;
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(0.25, t + 0.06);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterGain);
+
+      noise.start(t);
+      this._activeSpray = { noise, filter, gain };
+    } catch (e) {}
+  }
+
+  /** Плавная остановка звука струи мойки */
+  stopSpray() {
+    if (!this._activeSpray || !this.ctx) return;
+    try {
+      const { noise, gain } = this._activeSpray;
+      const t = this.ctx.currentTime;
+      gain.gain.setValueAtTime(gain.gain.value, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+      setTimeout(() => {
+        try { noise.stop(); } catch (e) {}
+      }, 100);
+    } catch (e) {}
+    this._activeSpray = null;
   }
 
   /** Короткий клик кнопки интерфейса (чистый синус, 50мс) */

@@ -8,7 +8,7 @@ function _ensureContainer() {
   if (!_toastContainer) {
     _toastContainer = document.createElement('div');
     _toastContainer.id = 'toast-container';
-    _toastContainer.style.cssText = 'position:fixed;top:60px;right:16px;z-index:300;display:flex;flex-direction:column;gap:8px;pointer-events:none;';
+    _toastContainer.style.cssText = 'position:fixed;bottom:calc(var(--safe-bottom, 0px) + 140px);left:50%;transform:translateX(-50%);z-index:250;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;width:max-content;max-width:92vw;';
     document.body.appendChild(_toastContainer);
   }
 }
