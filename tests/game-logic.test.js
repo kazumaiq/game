@@ -539,3 +539,20 @@ test('20. Погода меняет спрос и сохраняется меж�
   assert.equal(gameState.deserialize(snapshot), true);
   assert.equal(gameState.weather, 'snow');
 });
+
+
+test('21. Дополнительные направления приносят прибыль, имеют лимиты и сбрасываются на следующий день', () => {
+  gameState.initNewGame('roadside');
+  gameState.money = 3_000_000;
+  assert.equal(gameState.completeBusinessOrder('detailing').success, false);
+  assert.equal(gameState.buyBusinessUpgrade('detailing').success, true);
+  const order = gameState.completeBusinessOrder('detailing');
+  assert.equal(order.success, true);
+  assert.equal(order.profit, 12800);
+  assert.equal(gameState.businessOrdersToday.detailing, 1);
+  gameState.businessOrdersToday.detailing = 3;
+  assert.equal(gameState.completeBusinessOrder('detailing').success, false);
+  gameState.nextDay();
+  assert.equal(gameState.businessOrdersToday.detailing, 0);
+  assert.equal(gameState.completeBusinessOrder('detailing').success, true);
+});
