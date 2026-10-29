@@ -522,3 +522,20 @@ test('19. Карта города: участки покупаются один 
   assert.equal(gameState.cityPlots.residential, true);
   assert.equal(gameState.chemistryStock.basic, 50);
 });
+
+
+test('20. Погода меняет спрос и сохраняется между загрузками', () => {
+  gameState.initNewGame('roadside');
+  gameState.setWeather('clear');
+  const clearDemand = gameState.getDemandMultiplier();
+  gameState.setWeather('rain');
+  const rainDemand = gameState.getDemandMultiplier();
+  assert.ok(rainDemand > clearDemand);
+  gameState.setWeather('snow');
+  const snowDemand = gameState.getDemandMultiplier();
+  assert.ok(snowDemand > rainDemand);
+  const snapshot = gameState.serialize();
+  gameState.reset();
+  assert.equal(gameState.deserialize(snapshot), true);
+  assert.equal(gameState.weather, 'snow');
+});
