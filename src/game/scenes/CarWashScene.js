@@ -847,7 +847,7 @@ export default class CarWashScene extends Phaser.Scene {
       office.y + 68
     );
     if (!this._isWashing && officeDistance < 92) {
-      const businessButton = document.querySelector('[data-action="business"], #hud-business, #business-btn, [data-panel="business"]');
+      const businessButton = document.getElementById('hud-btn-business');
       if (businessButton && !businessButton.disabled) {
         businessButton.click();
       } else {
