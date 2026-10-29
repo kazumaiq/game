@@ -73,6 +73,7 @@ export function showDailyContractsPanel() {
         <div><strong>Бонус за все контракты</strong><p>Забери все 3 награды и получи дополнительную премию 15 000 ₽.</p></div>
         <strong class="daily-contracts-bonus-value">+15 000 ₽</strong>
       </div>
+      <div class="career-streak-banner" id="career-streak-banner"><span>🔥</span><div><strong>Серия идеальных моек</strong><p id="career-streak-copy">Каждая 3-я идеальная мойка подряд приносит денежный бонус.</p></div><strong id="career-streak-count">0 / 3</strong></div>
       <div class="career-achievements-section">
         <div class="career-achievements-heading"><div><span>ДОЛГОСРОЧНЫЙ ПРОГРЕСС</span><h3>Достижения карьеры</h3></div><strong id="career-achievements-count">0 / ${careerAchievements.length}</strong></div>
         <div class="career-achievements-list">
@@ -136,6 +137,14 @@ export function showDailyContractsPanel() {
 
     const summary = overlay.querySelector('#daily-contracts-summary');
     if (summary) summary.textContent = `${completedCount} из 3 выполнено · ${claimedCount} наград получено`;
+    const streakBanner = overlay.querySelector('#career-streak-banner');
+    const streakCopy = overlay.querySelector('#career-streak-copy');
+    const streakCount = overlay.querySelector('#career-streak-count');
+    const streak = Math.max(0, Number(gameState.perfectWashStreak) || 0);
+    if (streakBanner) streakBanner.classList.toggle('is-hot', streak > 0);
+    if (streakCopy) streakCopy.textContent = streak > 0 ? `Продолжай серию: ещё ${3 - (streak % 3 || 0)} до следующего бонуса.` : 'Каждая 3-я идеальная мойка подряд приносит денежный бонус.';
+    if (streakCount) streakCount.textContent = `${streak % 3} / 3 · рекорд ${gameState.bestPerfectWashStreak || 0}`;
+
     const currentAchievements = gameState.getCareerAchievements();
     const achievementCount = overlay.querySelector('#career-achievements-count');
     if (achievementCount) achievementCount.textContent = `${currentAchievements.filter(item => item.unlocked).length} / ${currentAchievements.length}`;
