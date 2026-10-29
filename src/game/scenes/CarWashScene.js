@@ -162,9 +162,137 @@ export default class CarWashScene extends Phaser.Scene {
     this._createGroundMarkings();
     this._createAmbientLighting();
     this._createScenery();
+    this._createCityDetails();
 
     this.physics.world.setBounds(20, 170, WORLD.width - 40, WORLD.height - 210);
     this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
+  }
+
+
+  /**
+   * Static city dressing around the playable yard.
+   * Kept as lightweight Phaser Graphics + existing generated car textures:
+   * no extra library, no new save data, and no changes to collision/gameplay.
+   */
+  _createCityDetails() {
+    const architecture = this.add.graphics().setDepth(1.4);
+    const drawFacade = (x, y, width, height, accent, title, subtitle) => {
+      // Ground shadow and raised curb make the facade sit in the scene.
+      architecture.fillStyle(0x030711, 0.32);
+      architecture.fillEllipse(x + width / 2 + 3, y + height + 8, width + 22, 16);
+      architecture.fillStyle(0x5d7180, 0.9);
+      architecture.fillRoundedRect(x - 5, y + height - 2, width + 10, 9, 2);
+      architecture.fillStyle(0x111a29, 0.98);
+      architecture.fillRoundedRect(x, y, width, height, 5);
+      architecture.fillStyle(0x26384a, 0.96);
+      architecture.fillRoundedRect(x + 4, y + 4, width - 8, height - 8, 3);
+      architecture.fillStyle(0x0b1422, 0.95);
+      architecture.fillRoundedRect(x + 8, y + 10, width - 16, height - 27, 2);
+      // Warm interior glass with cool vertical mullions.
+      architecture.fillStyle(0x9ac5c8, 0.28);
+      architecture.fillRect(x + 11, y + 13, width - 22, height - 34);
+      architecture.fillStyle(0xffd28a, 0.23);
+      architecture.fillRect(x + 14, y + 16, width - 28, height - 40);
+      architecture.lineStyle(2, 0x0d1b2a, 0.9);
+      architecture.strokeLineShape(new Phaser.Geom.Line(x + width * 0.36, y + 12, x + width * 0.36, y + height - 20));
+      architecture.strokeLineShape(new Phaser.Geom.Line(x + width * 0.65, y + 12, x + width * 0.65, y + height - 20));
+      // Canopy and thin illuminated trim.
+      architecture.fillStyle(0x172638, 1);
+      architecture.fillRoundedRect(x - 4, y + 5, width + 8, 8, 2);
+      architecture.fillStyle(accent, 0.88);
+      architecture.fillRoundedRect(x + 8, y + 7, width - 16, 2, 1);
+      architecture.fillStyle(0x0b1420, 0.98);
+      architecture.fillRoundedRect(x + 9, y + height - 21, width - 18, 14, 3);
+      architecture.lineStyle(1, accent, 0.7);
+      architecture.strokeRoundedRect(x + 9, y + height - 21, width - 18, 14, 3);
+      this.add.text(x + width / 2, y + height - 14, title, {
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontSize: '7px',
+        fontStyle: 'bold',
+        color: '#eaf7ff',
+        stroke: '#07111b',
+        strokeThickness: 2,
+        align: 'center',
+      }).setOrigin(0.5).setDepth(2.1);
+      this.add.text(x + width / 2, y + height + 15, subtitle, {
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontSize: '7px',
+        fontStyle: 'bold',
+        color: '#9bb1c4',
+        stroke: '#0b111b',
+        strokeThickness: 2,
+        align: 'center',
+      }).setOrigin(0.5).setDepth(2.1);
+    };
+
+    // Small neighbouring businesses frame the car wash without covering either bay.
+    drawFacade(28, 188, 112, 72, 0x4bd5e5, 'CITY AUTO', 'ЗАПЧАСТИ');
+    drawFacade(760, 188, 112, 72, 0xffb86b, 'COFFEE STOP', 'КОФЕ · ОЖИДАНИЕ');
+
+    // Marked customer parking pockets at the far edges of the lot.
+    const parking = this.add.graphics().setDepth(2.55);
+    for (const side of [{ x: 63, y: 322 }, { x: 737, y: 322 }]) {
+      parking.fillStyle(0x050912, 0.22);
+      parking.fillRoundedRect(side.x - 8, side.y - 22, 108, 62, 5);
+      parking.lineStyle(1.5, 0xd8e5ed, 0.48);
+      parking.strokeLineShape(new Phaser.Geom.Line(side.x, side.y - 19, side.x, side.y + 31));
+      parking.strokeLineShape(new Phaser.Geom.Line(side.x + 45, side.y - 19, side.x + 45, side.y + 31));
+      parking.strokeLineShape(new Phaser.Geom.Line(side.x + 90, side.y - 19, side.x + 90, side.y + 31));
+      parking.lineStyle(2, 0x38bdf8, 0.24);
+      parking.strokeLineShape(new Phaser.Geom.Line(side.x - 5, side.y + 35, side.x + 95, side.y + 35));
+    }
+
+    // Parked cars use the same high-resolution generated textures as customer cars.
+    // Their low depth keeps live cars, workers and effects fully interactive in front.
+    const parkedCars = [
+      { x: 86, y: 335, key: 'car_suv', scale: 0.27, tint: 0x8da7c5 },
+      { x: 782, y: 335, key: 'car_premium', scale: 0.27, tint: 0xd5c4a0 },
+    ];
+    for (const car of parkedCars) {
+      const shadow = this.add.ellipse(car.x + 2, car.y + 8, 43, 20, 0x02050a, 0.42).setDepth(2.7);
+      const sprite = this.add.image(car.x, car.y, car.key)
+        .setScale(car.scale)
+        .setTint(car.tint)
+        .setDepth(2.85);
+      // A tiny windshield glint helps the miniature vehicles read as glossy objects.
+      const glint = this.add.graphics().setDepth(2.9);
+      glint.lineStyle(1, 0xe6f7ff, 0.55);
+      glint.lineBetween(car.x - 5, car.y - 4, car.x + 3, car.y - 6);
+      sprite.setData('cityParkingCar', true);
+      shadow.setData('cityParkingShadow', true);
+    }
+
+    // Directional signs and reflective bollards add legibility at the entrance/exit.
+    const signs = this.add.graphics().setDepth(4.2);
+    for (const sign of [
+      { x: 22, y: 432, color: 0x38bdf8, label: 'IN' },
+      { x: 878, y: 432, color: 0x4ade80, label: 'OUT' },
+    ]) {
+      signs.fillStyle(0x050b14, 0.35);
+      signs.fillEllipse(sign.x, sign.y + 18, 17, 6);
+      signs.fillStyle(0x263647, 1);
+      signs.fillRoundedRect(sign.x - 2, sign.y - 2, 4, 22, 1);
+      signs.fillStyle(sign.color, 0.9);
+      signs.fillRoundedRect(sign.x - 13, sign.y - 11, 26, 14, 3);
+      signs.lineStyle(1, 0xeaf8ff, 0.45);
+      signs.strokeRoundedRect(sign.x - 13, sign.y - 11, 26, 14, 3);
+      this.add.text(sign.x, sign.y - 4, sign.label, {
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontSize: '7px',
+        fontStyle: 'bold',
+        color: '#06111c',
+      }).setOrigin(0.5).setDepth(4.3);
+    }
+
+    // Small pavement studs: deliberately sparse so they read as guidance, not noise.
+    const studs = this.add.graphics().setDepth(3.3);
+    for (let i = 0; i < 9; i++) {
+      const x = 195 + i * 64;
+      studs.fillStyle(i % 3 === 0 ? 0xffbd73 : 0x82eaff, i % 3 === 0 ? 0.52 : 0.28);
+      studs.fillRoundedRect(x, 535, 8, 2, 1);
+      studs.fillStyle(0xe6f8ff, 0.12);
+      studs.fillRoundedRect(x + 12, 541, 14, 1, 0);
+    }
   }
 
   _createDayCycleEffects() {
