@@ -195,7 +195,11 @@ class GameState {
       ceramic: { surcharge: 1800, chemistry: 'ceramic', costMult: 2.5 },
       interior: { surcharge: 700, chemistry: 'interior', costMult: 1.8 },
     };
-    const servicePackage = packageDefs[this.activeServicePackage] || packageDefs.standard;
+    let servicePackage = packageDefs[this.activeServicePackage] || packageDefs.standard;
+    if ((this.chemistryStock[servicePackage.chemistry] || 0) <= 0 && !(servicePackage.chemistry === 'basic' && this.suppliesStock > 0)) {
+      this.activeServicePackage = 'standard';
+      servicePackage = packageDefs.standard;
+    }
     const price = Math.round((this.servicePrice + servicePackage.surcharge) * carClass.priceMultiplier);
     const supplyCostMult = this.getUpgradeEffect('supplyEfficiency', 1);
     const supplyCost = Math.round(
