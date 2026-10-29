@@ -13,6 +13,7 @@ import { showToast } from '../../ui/ToastUI.js';
 import { StorySystem } from '../systems/StorySystem.js';
 import { tutorialSystem, TutorialSystem } from '../systems/TutorialSystem.js';
 import { audioManager } from '../systems/AudioManager.js';
+import { getShiftClock, getDayCycleProfile } from '../systems/DayCycle.js';
 
 const WORLD = {
   width: 900,
@@ -53,6 +54,8 @@ export default class CarWashScene extends Phaser.Scene {
     this._employeeSprites = {};
     this._walkAnimTimer = 0;
     this._walkFrame = 0;
+    this._dayCycleUpdateTimer = 0;
+    this._createDayCycleEffects();
 
     // Графический маркер подсветки целевой машины во время обучения
     this._targetHighlight = this.add.graphics();
@@ -162,6 +165,49 @@ export default class CarWashScene extends Phaser.Scene {
 
     this.physics.world.setBounds(20, 170, WORLD.width - 40, WORLD.height - 210);
     this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
+  }
+
+  _createDayCycleEffects() {
+    // A subtle full-world color grade makes the passage of the shift visible
+    // without changing the artwork itself. Practical lights glow brighter at dusk.
+    this._dayTint = this.add.rectangle(WORLD.width / 2, WORLD.height / 2, WORLD.width, WORLD.height, 0xffffff, 0)
+      .setDepth(23)
+      .setBlendMode(Phaser.BlendModes.MULTIPLY);
+    this._dayLights = this.add.graphics()
+      .setDepth(24)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    this._updateDayCycle();
+  }
+
+  _updateDayCycle() {
+    if (!this._dayTint || !this._dayLights) return;
+    const clock = getShiftClock(gameState.shiftTimeRemaining, BALANCE.time);
+    const profile = getDayCycleProfile(clock.hour);
+    this._dayTint.setFillStyle(profile.tintColor, profile.tintAlpha);
+    this.cameras.main.setBackgroundColor(profile.tintColor);
+
+    const lights = this._dayLights;
+    lights.clear();
+    const intensity = profile.lampAlpha;
+    if (intensity > 0.005) {
+      // Concentric additive halos imitate warm lamps reflecting on wet concrete.
+      for (const pos of WORLD.posts) {
+        lights.fillStyle(0xffcb79, intensity * 0.035);
+        lights.fillCircle(pos.x, pos.y + 18, 88);
+        lights.fillStyle(0xffd896, intensity * 0.055);
+        lights.fillCircle(pos.x, pos.y + 18, 56);
+        lights.fillStyle(0xffefc2, intensity * 0.075);
+        lights.fillEllipse(pos.x, pos.y + 23, 78, 27);
+      }
+      for (const x of [30, 870]) {
+        lights.fillStyle(0xffd27a, intensity * 0.055);
+        lights.fillCircle(x, 280, 60);
+        lights.fillStyle(0xffe4a3, intensity * 0.09);
+        lights.fillCircle(x, 280, 29);
+      }
+      lights.fillStyle(0xffbf69, intensity * 0.06);
+      lights.fillRoundedRect(405, 84, 90, 5, 2);
+    }
   }
 
   _createGroundMarkings() {
@@ -1283,6 +1329,11 @@ export default class CarWashScene extends Phaser.Scene {
 
     this._shiftTimer += delta;
     gameState.shiftTimeRemaining = Math.max(0, BALANCE.time.shiftDurationMs - this._shiftTimer);
+    this._dayCycleUpdateTimer += delta;
+    if (this._dayCycleUpdateTimer >= 100) {
+      this._dayCycleUpdateTimer = 0;
+      this._updateDayCycle();
+    }
 
     this._updateCameraTracking(false);
     this._updateDepth();
@@ -1290,6 +1341,11 @@ export default class CarWashScene extends Phaser.Scene {
     this._updateTargetHighlight(time);
     this._updateSprayEffect(time);
     this._updatePostStatuses();
+
+    if (gameState.shiftTimeRemaining <= 0) {
+      this.endShift();
+      return;
+    }
 
     if (Math.floor(time / 250) !== Math.floor((time - delta) / 250)) {
       updateHUD();
@@ -1371,6 +1427,9 @@ export default class CarWashScene extends Phaser.Scene {
   endShift() {
     if (gameState.shiftEndProcessing) return;
     gameState.shiftEndProcessing = true;
+    gameState.shiftActive = false;
+    gameState.shiftTimeRemaining = 0;
+    updateHUD();
 
     this._stopWashing();
 
@@ -1501,6 +1560,8 @@ export default class CarWashScene extends Phaser.Scene {
     gameState.nextDay();
     this._shiftTimer = 0;
     this._spawnTimer = 0;
+    this._dayCycleUpdateTimer = 0;
+    this._updateDayCycle();
     this._storySystem.checkEvents(this);
     updateHUD();
     saveSystem.save();
