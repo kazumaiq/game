@@ -3013,3 +3013,122 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     font-size: 6px;
   }
 }
+
+
+/* ================= MOBILE MENU REBALANCE =================
+   The main menu should breathe: one clear primary action, less visual noise,
+   and no oversized stack of promo labels on a narrow portrait viewport.
+*/
+@media (max-width: 600px) and (orientation: portrait) {
+  .menu-screen-premium {
+    padding-top: max(env(safe-area-inset-top, 0px), 12px);
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 10px);
+    gap: 8px;
+    background:
+      linear-gradient(180deg, rgba(4, 8, 18, 0.58), rgba(4, 8, 18, 0.16) 34%, rgba(3, 7, 15, 0.88) 100%);
+  }
+  .menu-screen-premium .menu-zone-top {
+    width: 100%;
+    padding-top: 0;
+  }
+  .menu-screen-premium .menu-brand-row {
+    margin-bottom: clamp(12px, 2.6vh, 22px);
+    gap: 8px;
+  }
+  .menu-screen-premium .menu-edition-pill {
+    display: none;
+  }
+  .menu-screen-premium .menu-logo-group {
+    gap: 3px;
+  }
+  .menu-screen-premium .menu-eyebrow {
+    font-size: 8px;
+    letter-spacing: 0.13em;
+  }
+  .menu-screen-premium .menu-title {
+    font-size: clamp(34px, 10vw, 54px);
+    letter-spacing: 0.045em;
+  }
+  .menu-screen-premium .menu-subtitle {
+    font-size: clamp(11px, 3vw, 15px);
+    letter-spacing: 0.22em;
+  }
+  .menu-screen-premium .menu-tagline {
+    max-width: 310px;
+    margin-top: 5px;
+    font-size: 11px;
+    line-height: 1.45;
+    color: rgba(226, 232, 240, 0.72);
+  }
+  .menu-screen-premium .menu-feature-pills {
+    margin-top: 10px;
+    gap: 5px;
+  }
+  .menu-screen-premium .menu-feature-pills span {
+    padding: 6px 8px;
+    font-size: 7px;
+    background: rgba(7, 13, 25, 0.3);
+  }
+  .menu-screen-premium .menu-zone-center {
+    min-height: clamp(28px, 5vh, 52px);
+    padding-bottom: 4px;
+  }
+  .menu-screen-premium .menu-scene-caption {
+    padding: 6px 9px;
+    font-size: 7px;
+  }
+  .menu-screen-premium .menu-zone-bottom {
+    width: 100%;
+    max-width: 420px;
+    gap: 6px;
+  }
+  .menu-screen-premium .menu-control-card {
+    padding: clamp(11px, 3vw, 15px);
+    border-radius: 17px;
+    background: linear-gradient(145deg, rgba(14, 24, 39, 0.84), rgba(4, 10, 20, 0.78));
+  }
+  .menu-screen-premium .menu-control-card-top {
+    margin-bottom: 7px;
+  }
+  .menu-screen-premium .menu-control-kicker {
+    font-size: 7px;
+    letter-spacing: 0.13em;
+  }
+  .menu-screen-premium .menu-control-title {
+    font-size: clamp(14px, 4vw, 17px);
+  }
+  .menu-screen-premium .menu-save-indicator {
+    margin-bottom: 8px;
+    font-size: 8px;
+  }
+  .menu-screen-premium .menu-btn-premium {
+    min-height: 52px;
+    padding: 8px 10px;
+    border-radius: 12px;
+  }
+  .menu-screen-premium .menu-btn-copy strong {
+    font-size: 12px;
+  }
+  .menu-screen-premium .menu-btn-copy small {
+    font-size: 9px;
+  }
+  .menu-screen-premium .menu-bottom-row {
+    margin-top: 5px;
+  }
+  .menu-screen-premium .menu-footer-row {
+    display: none;
+  }
+}
+
+/* HUD remains usable on the portrait phone; compact secondary controls. */
+@media (max-width: 460px) and (orientation: portrait) {
+  .hud-clean { padding-left: max(6px, env(safe-area-inset-left, 0px)); padding-right: max(6px, env(safe-area-inset-right, 0px)); }
+  .hud-bar { gap: 4px; }
+  .hud-pill-group { gap: 3px; }
+  .hud-pill { padding-left: 6px; padding-right: 6px; }
+  .mobile-controls .joystick-zone { left: max(10px, env(safe-area-inset-left, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }
+  .mobile-controls .joystick-base { width: 104px; height: 104px; }
+  .mobile-controls .joystick-stick { width: 44px; height: 44px; }
+  .mobile-controls .interact-btn-container { right: max(10px, env(safe-area-inset-right, 0px)); bottom: max(14px, env(safe-area-inset-bottom, 0px)); }
+  .mobile-controls .mobile-action-btn { width: 76px; height: 76px; }
+}
