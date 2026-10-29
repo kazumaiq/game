@@ -49,6 +49,7 @@ export default class CarWashScene extends Phaser.Scene {
     this._carSprites = {};
     this._washingCar = null;
     this._isWashing = false;
+    this._coffeeRushUntil = 0;
 
     this._spawnTimer = 0;
     this._shiftTimer = 0;
@@ -343,6 +344,27 @@ export default class CarWashScene extends Phaser.Scene {
     // Small neighbouring businesses frame the car wash without covering either bay.
     drawFacade(28, 188, 112, 72, 0x4bd5e5, 'CITY AUTO', 'ЗАПЧАСТИ');
     drawFacade(760, 188, 112, 72, 0xffb86b, 'COFFEE STOP', 'КОФЕ · ОЖИДАНИЕ');
+
+    // Steam drifting from the cafe makes the neighbouring business feel alive.
+    this._coffeeSteam = [];
+    for (let i = 0; i < 3; i++) {
+      const steam = this.add.circle(806 + i * 9, 202 + (i % 2) * 3, 2.2, 0xffe4bd, 0.45)
+        .setDepth(3.2 + i * 0.001);
+      this._coffeeSteam.push(steam);
+      this.tweens.add({
+        targets: steam,
+        y: steam.y - 13 - i * 2,
+        x: steam.x + (i % 2 ? 4 : -3),
+        alpha: 0,
+        scale: 1.7,
+        duration: 1800 + i * 260,
+        delay: i * 420,
+        repeat: -1,
+        onRepeat: () => {
+          if (steam.active) { steam.setPosition(806 + i * 9, 202 + (i % 2) * 3); steam.setAlpha(0.45); steam.setScale(1); }
+        },
+      });
+    }
 
     // Marked customer parking pockets at the far edges of the lot.
     const parking = this.add.graphics().setDepth(2.55);
@@ -882,6 +904,13 @@ export default class CarWashScene extends Phaser.Scene {
       return;
     }
 
+    const coffeeDistance = Phaser.Math.Distance.Between(this.player.x, this.player.y, 816, 224);
+    if (coffeeDistance < 108) {
+      btnText.textContent = 'КОФЕ';
+      btnSub.textContent = this._coffeeRushUntil > this.time.now ? 'КЛИЕНТЫ ЖДУТ' : 'ПОДДЕРЖАТЬ ОЧЕРЕДЬ';
+      return;
+    }
+
     // Show the office action before generic bay actions when the player reaches the entrance.
     const officeDistance = Phaser.Math.Distance.Between(
       this.player.x, this.player.y, WORLD.building.x, WORLD.building.y + 68
@@ -969,6 +998,17 @@ export default class CarWashScene extends Phaser.Scene {
 
   _handleInteract() {
     if (gameState.paused || !gameState.shiftActive) return;
+
+    // Coffee Stop is a useful customer amenity: one interaction gives the queue
+    // a short patience boost, so the neighbouring cafe has a clear gameplay role.
+    const coffeeDistance = Phaser.Math.Distance.Between(this.player.x, this.player.y, 816, 224);
+    if (!this._isWashing && coffeeDistance < 96) {
+      this._coffeeRushUntil = this.time.now + 25000;
+      audioManager.play('buttonClick');
+      this._showCoffeeSteamBurst(816, 220);
+      showToast('☕ Кофе готов! Клиенты в очереди подождут ещё 25 секунд.', 'success');
+      return;
+    }
 
     // Office entrance above the wash bays: open existing business management UI.
     // Reuse the current HUD action so finances/upgrades stay in one source of truth.
@@ -1195,6 +1235,16 @@ export default class CarWashScene extends Phaser.Scene {
     }
   }
 
+  _showCoffeeSteamBurst(x, y) {
+    const burst = this.add.particles(x, y, 'particle', {
+      speed: { min: 18, max: 48 }, angle: { min: 230, max: 310 },
+      scale: { start: 0.6, end: 0 }, alpha: { start: 0.75, end: 0 },
+      lifespan: 520, quantity: 8, tint: [0xffd7a0, 0xfff0d0], emitting: false,
+    }).setDepth(30);
+    burst.explode(8, x, y);
+    this.time.delayedCall(650, () => { if (burst && burst.active) burst.destroy(); });
+  }
+
   _checkBreakdown(postId) {
     if (!postId) return;
     const reliabilityMult = gameState.getUpgradeEffect('reliability', 1);
@@ -1376,6 +1426,8 @@ export default class CarWashScene extends Phaser.Scene {
   }
 
   _processPatience(delta) {
+    // While the coffee amenity is active, queued customers pause their patience timer.
+    if (this._coffeeRushUntil > this.time.now) return;
     const toRemove = [];
     for (const carId of gameState.queue) {
       const car = gameState.getCar(carId);
