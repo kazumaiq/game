@@ -5,8 +5,9 @@ import LocationSelectScene from './scenes/LocationSelectScene.js';
 import CarWashScene from './scenes/CarWashScene.js';
 
 export function createGame() {
-  // Вычисляем разрешение устройства с ограничением до 2 для оптимальной четкости без просадки FPS
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  // Используем полный Retina DPR на телефонах (iPhone обычно 3x), ограничивая только экраны выше 3x.
+  // Это повышает чёткость Phaser-текста, тонких линий и процедурных текстур на мобильных устройствах.
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
 
   const config = {
     type: Phaser.AUTO,
@@ -22,7 +23,7 @@ export function createGame() {
     render: {
       antialias: true,
       pixelArt: false,
-      roundPixels: false,
+      roundPixels: true,
       powerPreference: 'high-performance',
     },
     physics: {
