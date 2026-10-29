@@ -466,6 +466,48 @@ export default class CarWashScene extends Phaser.Scene {
     light.fillEllipse(WORLD.entrance.x + 55, WORLD.entrance.y - 35, 78, 38);
     light.fillStyle(0x22c55e, 0.035);
     light.fillEllipse(WORLD.exit.x - 40, WORLD.exit.y - 35, 82, 34);
+
+    // Wet-ground specular streaks: clustered by light source, with darker
+    // gaps between them so the concrete reads glossy rather than uniformly blue.
+    const puddleGroups = [
+      { x: WORLD.posts[0].x, y: WORLD.posts[0].y + 82, color: 0x38bdf8 },
+      { x: WORLD.posts[1].x, y: WORLD.posts[1].y + 82, color: 0x67e8f9 },
+    ];
+    for (const puddle of puddleGroups) {
+      light.fillStyle(0x020711, 0.12);
+      light.fillEllipse(puddle.x + 4, puddle.y + 7, 142, 29);
+      light.fillStyle(puddle.color, 0.055);
+      light.fillEllipse(puddle.x, puddle.y + 1, 128, 22);
+      light.fillStyle(0xe0f2fe, 0.12);
+      light.fillRoundedRect(puddle.x - 47, puddle.y - 2, 26, 1.5, 1);
+      light.fillStyle(puddle.color, 0.1);
+      light.fillRoundedRect(puddle.x + 12, puddle.y + 4, 43, 1.5, 1);
+      light.fillStyle(0xffffff, 0.08);
+      light.fillRoundedRect(puddle.x - 8, puddle.y + 8, 14, 1, 1);
+    }
+
+    // Short broken reflections beneath the building frontage give a subtle
+    // sense of wet paving without creating a noisy repeated pattern.
+    const frontageReflections = [
+      [188, 278, 34, 1, 0xf8fafc, 0.1],
+      [232, 286, 18, 1, 0x67e8f9, 0.11],
+      [678, 279, 41, 1, 0xffd28a, 0.11],
+      [731, 286, 23, 1, 0xe0f2fe, 0.09],
+      [386, 301, 29, 1, 0x94a3b8, 0.08],
+      [549, 307, 36, 1, 0x67e8f9, 0.08],
+    ];
+    for (const [x, y, width, height, color, alpha] of frontageReflections) {
+      light.fillStyle(color, alpha);
+      light.fillRoundedRect(x, y, width, height, 1);
+    }
+
+    // Soft shadow under the car-wash bay apron anchors the buildings to the lot.
+    light.fillStyle(0x02040a, 0.16);
+    for (const pos of WORLD.posts) {
+      light.fillEllipse(pos.x, pos.y + 69, 184, 18);
+      light.fillStyle(0x0b1522, 0.14);
+      light.fillEllipse(pos.x, pos.y + 72, 150, 10);
+    }
   }
 
   _createScenery() {
