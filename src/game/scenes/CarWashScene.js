@@ -171,17 +171,17 @@ export default class CarWashScene extends Phaser.Scene {
         .setDepth(6);
       if (postData.unlocked === false) sprite.setAlpha(0.16);
 
-      const label = this.add.text(pos.x, pos.y - (compactExpansion ? 76 : 112),
-        postData.unlocked === false ? `${pos.label.toUpperCase()} · ЗАКРЫТ` : `${pos.label.toUpperCase()} · ГОТОВ`, {
-        fontSize: compactExpansion ? '9px' : '11px',
+      const label = this.add.text(pos.x, pos.y - (compactExpansion ? 68 : 104),
+        postData.unlocked === false ? 'ЗАКРЫТ' : 'ГОТОВ', {
+        fontSize: compactExpansion ? '8px' : '9px',
         color: '#8df4ff',
-        backgroundColor: 'rgba(5, 12, 24, 0.98)',
-        padding: compactExpansion ? { x: 6, y: 4 } : { x: 8, y: 4 },
+        backgroundColor: 'rgba(5, 12, 24, 0.82)',
+        padding: { x: 5, y: 3 },
         fontFamily: 'Arial, Helvetica, sans-serif',
         fontStyle: 'bold',
         stroke: '#07111f',
-        strokeThickness: 3,
-        shadow: { offsetX: 0, offsetY: 2, color: '#000000', blur: 4, fill: true },
+        strokeThickness: 2,
+        shadow: { offsetX: 0, offsetY: 1, color: '#000000', blur: 3, fill: true },
       }).setOrigin(0.5).setDepth(8);
       if (postData.unlocked === false) label.setColor('#94a3b8');
 
@@ -730,21 +730,32 @@ export default class CarWashScene extends Phaser.Scene {
       const lbl = this._postStatusLabels[i];
       if (!lbl) continue;
 
+      const sprite = this._postSprites[i];
       if (post.unlocked === false) {
-        lbl.setText(`${WORLD.posts[i].label.toUpperCase()} · ЗАКРЫТ`);
+        lbl.setText('ЗАКРЫТ');
         lbl.setColor('#94a3b8');
-        if (this._postSprites[i]) this._postSprites[i].setAlpha(0.16);
+        if (sprite) sprite.setAlpha(0.16);
       } else if (post.broken) {
-        lbl.setText(`${WORLD.posts[i].label.toUpperCase()} · АВАРИЯ`);
+        lbl.setText('АВАРИЯ');
         lbl.setColor('#ef4444');
+        if (sprite) {
+          sprite.setTexture('wash-bay-broken-art');
+          sprite.setAlpha(1);
+        }
       } else if (post.busy) {
-        lbl.setText(`${WORLD.posts[i].label.toUpperCase()} · МОЙКА`);
-        if (this._postSprites[i]) this._postSprites[i].setAlpha(1);
+        lbl.setText('МОЙКА');
+        if (sprite) {
+          sprite.setTexture('wash-bay-art');
+          sprite.setAlpha(1);
+        }
         lbl.setColor('#22c55e');
       } else {
-        lbl.setText(`${WORLD.posts[i].label.toUpperCase()} · ГОТОВ`);
+        lbl.setText('ГОТОВ');
         lbl.setColor('#38bdf8');
-        if (this._postSprites[i]) this._postSprites[i].setAlpha(1);
+        if (sprite) {
+          sprite.setTexture('wash-bay-art');
+          sprite.setAlpha(1);
+        }
       }
     }
   }
