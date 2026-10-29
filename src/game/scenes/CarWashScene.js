@@ -454,6 +454,16 @@ export default class CarWashScene extends Phaser.Scene {
     const lights = this._dayLights;
     lights.clear();
     const intensity = profile.lampAlpha;
+    // Warm low-angle sunlight makes morning read as morning, not as a dark night map.
+    if (clock.hour < 10.5) {
+      const morningStrength = clock.hour < 9 ? 0.12 : 0.065;
+      lights.fillStyle(0xffb85e, morningStrength * 0.28);
+      lights.fillCircle(450, 115, 230);
+      lights.fillStyle(0xffd18a, morningStrength * 0.34);
+      lights.fillEllipse(450, 320, 570, 250);
+      lights.fillStyle(0xffe0a3, morningStrength * 0.18);
+      for (const pos of WORLD.posts.slice(0, 2)) lights.fillEllipse(pos.x, pos.y + 18, 115, 48);
+    }
     if (intensity > 0.005) {
       // Concentric additive halos imitate warm lamps reflecting on wet concrete.
       for (const pos of WORLD.posts) {
