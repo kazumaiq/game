@@ -45,6 +45,7 @@ class GameState {
     this.cityPlots = { roadside: true, residential: false, business: false, industrial: false };
     this.weather = 'clear';
     this.customerSegments = { regular: 0, taxi: 0, premium: 0, fleet: 0 };
+    this.businessOrdersToday = { detailing: 0, tireService: 0, sto: 0, coffeeShop: 0 };
 
     this.upgrades = {};
     for (const key of Object.keys(BALANCE.upgrades)) {
@@ -340,6 +341,41 @@ class GameState {
     return { success: true, upgrade: def, level: level + 1 };
   }
 
+  /** Выполнение дополнительного заказа. Каждый объект имеет дневной лимит и собственную экономику. */
+  completeBusinessOrder(serviceId) {
+    const definitions = {
+      detailing: { name: 'Детейлинг', price: 18000, cost: 5200, limit: 3, segment: 'premium', reputation: 1 },
+      tireService: { name: 'Шиномонтаж', price: 6500, cost: 1900, limit: 5, segment: 'taxi', reputation: 0.4 },
+      sto: { name: 'Ремонт на СТО', price: 24000, cost: 10500, limit: 2, segment: 'fleet', reputation: 1.2 },
+      coffeeShop: { name: 'Продажа в кофейне', price: 850, cost: 320, limit: 8, segment: 'regular', reputation: 0.1 },
+    };
+    const def = definitions[serviceId];
+    if (!def) return { success: false, reason: 'Неизвестная услуга' };
+    if (!(this.businessUpgrades[serviceId] > 0)) return { success: false, reason: 'Сначала построй это направление' };
+    const done = this.businessOrdersToday[serviceId] || 0;
+    if (done >= def.limit) return { success: false, reason: 'На сегодня все доступные заказы выполнены' };
+    if (this.money < def.cost) return { success: false, reason: 'Недостаточно средств на материалы и закупки' };
+
+    // В непогоду растёт спрос на шиномонтаж, а премиальные услуги зависят от репутации.
+    let demand = 1;
+    if (serviceId === 'tireService' && this.weather === 'snow') demand = 1.25;
+    if (serviceId === 'detailing') demand = 0.75 + this.reputation / 200;
+    if (this.marketingActive) demand *= 1.1;
+    const revenue = Math.round(def.price * demand);
+    this.money += revenue - def.cost;
+    this.businessOrdersToday[serviceId] = done + 1;
+    this.customerSegments[def.segment] = (this.customerSegments[def.segment] || 0) + 1;
+    this.stats.totalRevenue += revenue;
+    this.stats.totalExpenses += def.cost;
+    this.stats.todayRevenue += revenue;
+    this.stats.todayExpenses += def.cost;
+    this.changeReputation(def.reputation);
+    this._logFinance('income', `Заказ: ${def.name}`, revenue);
+    this._logFinance('expense', `Материалы и закупки: ${def.name}`, def.cost);
+    this.emit('stateChanged');
+    return { success: true, name: def.name, revenue, cost: def.cost, profit: revenue - def.cost, remaining: def.limit - done - 1 };
+  }
+
   /** Погода влияет на спрос и отображается в игровой сцене. */
   setWeather(weather) {
     if (!['clear', 'rain', 'snow'].includes(weather)) return { success: false, reason: 'Неизвестная погода' };
@@ -585,6 +621,7 @@ class GameState {
     this.stats.todayRevenue = 0;
     this.stats.todayExpenses = 0;
     this.stats.todayPerfectWashes = 0;
+    this.businessOrdersToday = { detailing: 0, tireService: 0, sto: 0, coffeeShop: 0 };
     this._refreshDailyContracts();
 
     if (this.marketingActive) {
@@ -763,6 +800,7 @@ class GameState {
       cityPlots: { ...this.cityPlots },
       weather: this.weather,
       customerSegments: { ...this.customerSegments },
+      businessOrdersToday: { ...this.businessOrdersToday },
       reputation: this.reputation,
       upgrades: { ...this.upgrades },
       employees: this.employees.map(e => ({ ...e })),
@@ -814,6 +852,7 @@ class GameState {
     if (data.cityPlots && typeof data.cityPlots === 'object') this.cityPlots = { ...this.cityPlots, ...data.cityPlots };
     if (['clear', 'rain', 'snow'].includes(data.weather)) this.weather = data.weather;
     if (data.customerSegments && typeof data.customerSegments === 'object') this.customerSegments = { ...this.customerSegments, ...data.customerSegments };
+    if (data.businessOrdersToday && typeof data.businessOrdersToday === 'object') this.businessOrdersToday = { ...this.businessOrdersToday, ...data.businessOrdersToday };
 
     this.reputation = typeof data.reputation === 'number' ?
       Math.max(BALANCE.reputation.min, Math.min(BALANCE.reputation.max, data.reputation)) :
