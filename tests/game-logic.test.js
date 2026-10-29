@@ -435,3 +435,34 @@ test('22. Прогресс идеальной мойки и состояние �
   assert.equal(gameState.getDailyContracts().find(contract => contract.id === 'wash').claimed, true);
   assert.equal(gameState.stats.todayPerfectWashes, 1);
 });
+
+
+import { getShiftClock, getDayCycleProfile } from '../src/game/systems/DayCycle.js';
+
+test('23. Часы смены плавно проходят утро, день и вечер', () => {
+  const cfg = BALANCE.time;
+  const morning = getShiftClock(cfg.shiftDurationMs, cfg);
+  const noon = getShiftClock(cfg.shiftDurationMs / 2, cfg);
+  const evening = getShiftClock(0, cfg);
+
+  assert.equal(morning.clock, '08:00');
+  assert.equal(morning.phase, 'morning');
+  assert.equal(noon.clock, '14:00');
+  assert.equal(noon.phase, 'day');
+  assert.equal(evening.clock, '20:00');
+  assert.equal(evening.phase, 'evening');
+  assert.equal(getShiftClock(-500, cfg).clock, '20:00');
+});
+
+test('24. Суточный цикл усиливает освещение постов к вечеру', () => {
+  const morning = getDayCycleProfile(8);
+  const noon = getDayCycleProfile(12);
+  const sunset = getDayCycleProfile(18);
+  const evening = getDayCycleProfile(20);
+
+  assert.ok(morning.tintAlpha > noon.tintAlpha);
+  assert.ok(sunset.tintAlpha > noon.tintAlpha);
+  assert.ok(evening.tintAlpha > sunset.tintAlpha);
+  assert.ok(evening.lampAlpha > sunset.lampAlpha);
+  assert.equal(evening.phase, 'evening');
+});
