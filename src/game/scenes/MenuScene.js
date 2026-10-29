@@ -96,6 +96,20 @@ export default class MenuScene extends Phaser.Scene {
       cityGfx.fillStyle(0x0c1220, 0.9);
     }
 
+    // === ТОНКИЕ ОБЛАКА И СЛОИ ЗАКАТНОЙ АТМОСФЕРЫ ===
+    const cloudGfx = this.add.graphics();
+    const cloudBands = [
+      { y: horizonY * 0.43, x: width * 0.07, w: width * 0.24, color: 0xfca5a5, alpha: 0.13 },
+      { y: horizonY * 0.54, x: width * 0.59, w: width * 0.22, color: 0xfdba74, alpha: 0.16 },
+      { y: horizonY * 0.64, x: width * 0.16, w: width * 0.18, color: 0xc4b5fd, alpha: 0.12 },
+      { y: horizonY * 0.72, x: width * 0.69, w: width * 0.21, color: 0xfda4af, alpha: 0.12 },
+    ];
+    for (const band of cloudBands) {
+      cloudGfx.fillStyle(band.color, band.alpha);
+      cloudGfx.fillRoundedRect(band.x, band.y, band.w, 2, 1);
+      cloudGfx.fillRoundedRect(band.x + band.w * 0.12, band.y + 5, band.w * 0.58, 1, 1);
+    }
+
     // === МОКРЫЙ АСФАЛЬТ ===
     const groundY = horizonY;
     const groundGfx = this.add.graphics();
@@ -118,6 +132,45 @@ export default class MenuScene extends Phaser.Scene {
       reflGfx.fillStyle(warmReflection ? 0xfb923c : 0x38bdf8, warmReflection ? 0.025 + Math.random() * 0.035 : 0.03 + Math.random() * 0.04);
       reflGfx.fillRoundedRect(rx, ry, rw * (warmReflection ? 0.85 : 1), 1 + (i % 3 === 0 ? 1 : 0), 0);
     }
+
+    // Отражение закатного диска на мокрой дороге: короткие неровные полосы.
+    const sunsetReflection = this.add.graphics();
+    const reflectionSpan = Math.max(1, height - groundY);
+    for (let i = 0; i < 34; i++) {
+      const t = (i + 1) / 35;
+      const y = groundY + t * reflectionSpan * 0.92;
+      const spread = 10 + t * width * 0.17;
+      const rw = 5 + t * (8 + (i % 6) * 4);
+      const rx = width * 0.5 + (Math.sin(i * 2.17) * spread) - rw / 2;
+      const alpha = (0.07 + (1 - t) * 0.13) * (i % 4 === 0 ? 0.65 : 1);
+      sunsetReflection.fillStyle(i % 5 === 0 ? 0x67e8f9 : 0xfb923c, alpha);
+      sunsetReflection.fillRoundedRect(rx, y, rw, i % 3 === 0 ? 2 : 1, 1);
+    }
+
+    // Силуэты пальм по краям кадра подчёркивают закатный городской стиль,
+    // но остаются за пределами центральной зоны автомойки.
+    const palmGfx = this.add.graphics();
+    const drawPalm = (x, baseY, scale, lean) => {
+      const crownX = x + lean;
+      const crownY = baseY - 88 * scale;
+      palmGfx.lineStyle(5 * scale, 0x111625, 0.82);
+      palmGfx.lineBetween(x, baseY, crownX, crownY);
+      palmGfx.lineStyle(2.4 * scale, 0x111625, 0.9);
+      for (let frond = 0; frond < 7; frond++) {
+        const angle = -Math.PI + (frond / 6) * Math.PI * 1.88;
+        const reach = (30 + (frond % 3) * 6) * scale;
+        const endX = crownX + Math.cos(angle) * reach;
+        const endY = crownY + Math.sin(angle) * reach * 0.62 - 3 * scale;
+        const midX = crownX + (endX - crownX) * 0.55 + lean * 0.12;
+        const midY = crownY + (endY - crownY) * 0.5 + 7 * scale;
+        palmGfx.lineBetween(crownX, crownY, midX, midY);
+        palmGfx.lineBetween(midX, midY, endX, endY);
+        palmGfx.lineBetween(midX, midY, midX + Math.cos(angle + 0.55) * 9 * scale, midY + Math.sin(angle + 0.55) * 8 * scale);
+      }
+    };
+    drawPalm(width * 0.055, groundY + height * 0.29, Math.min(1, width / 650), 7);
+    drawPalm(width * 0.94, groundY + height * 0.31, Math.min(0.9, width / 720), -8);
+    drawPalm(width * 0.86, groundY + height * 0.36, Math.min(0.62, width / 1000), 4);
 
     // === ЦЕНТРАЛЬНАЯ КОМПОЗИЦИЯ: ЗДАНИЕ АВТОМОЙКИ ===
     const centerX = width * 0.5;
