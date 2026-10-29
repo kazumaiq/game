@@ -48,8 +48,10 @@ class GameState {
     this.cars = [];
     this.queue = [];
     this.posts = [
-      { id: 'post_1', busy: false, carId: null, broken: false },
-      { id: 'post_2', busy: false, carId: null, broken: false },
+      { id: 'post_1', busy: false, carId: null, broken: false, unlocked: true },
+      { id: 'post_2', busy: false, carId: null, broken: false, unlocked: true },
+      { id: 'post_3', busy: false, carId: null, broken: false, unlocked: false },
+      { id: 'post_4', busy: false, carId: null, broken: false, unlocked: false },
     ];
 
     this.servicePrice = BALANCE.services.expressWash.basePrice;
@@ -294,6 +296,24 @@ class GameState {
     return { success: true, newLevel: currentLevel + 1 };
   }
 
+  /** Открыть новый моечный бокс за счёт средств бизнеса. */
+  unlockPost(postId) {
+    const post = this.posts.find(p => p.id === postId);
+    const costs = { post_3: 450000, post_4: 900000 };
+    const price = costs[postId];
+    if (!post || !price) return { success: false, reason: 'Бокс не найден' };
+    if (post.unlocked !== false) return { success: false, reason: 'Бокс уже открыт' };
+    if (postId === 'post_4' && this.posts.some(p => p.id === 'post_3' && !p.unlocked)) return { success: false, reason: 'Сначала открой третий бокс' };
+    if (this.money < price) return { success: false, reason: 'Недостаточно средств' };
+    this.money -= price;
+    post.unlocked = true;
+    this.stats.totalExpenses += price;
+    this.stats.todayExpenses += price;
+    this._logFinance('expense', 'Открытие ' + (postId === 'post_3' ? 'третьего' : 'четвёртого') + ' бокса', price);
+    this.emit('stateChanged');
+    return { success: true, postId, price };
+  }
+
   /** Получить эффект улучшения */
   getUpgradeEffect(upgradeId, defaultValue = 1) {
     const def = BALANCE.upgrades[upgradeId];
@@ -387,7 +407,7 @@ class GameState {
   assignCarToPost(carId, postId) {
     const car = this.getCar(carId);
     const post = this.posts.find(p => p.id === postId);
-    if (!car || !post || post.busy || post.broken) return false;
+    if (!car || !post || post.unlocked === false || post.busy || post.broken) return false;
 
     post.busy = true;
     post.carId = carId;
@@ -674,7 +694,7 @@ class GameState {
       buyoutOffered: this.buyoutOffered,
       buyoutAccepted: this.buyoutAccepted,
       settings: { ...this.settings },
-      posts: this.posts.map(p => ({ id: p.id, broken: p.broken })),
+      posts: this.posts.map(p => ({ id: p.id, broken: p.broken, unlocked: p.unlocked !== false })),
     };
   }
 
@@ -732,7 +752,11 @@ class GameState {
     if (Array.isArray(data.posts)) {
       for (const savedPost of data.posts) {
         const post = this.posts.find(p => p.id === savedPost.id);
-        if (post) post.broken = !!savedPost.broken;
+        if (post) {
+          post.broken = !!savedPost.broken;
+          // Old saves preserve the original two open bays; expansion bays stay locked.
+          if (typeof savedPost.unlocked === 'boolean') post.unlocked = savedPost.unlocked;
+        }
       }
     }
 
