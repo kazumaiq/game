@@ -140,7 +140,7 @@ test('10. Сериализация и восстановление (Save / Resto
   gameState.buyDocument('vodokanal');
 
   const snapshot = gameState.serialize();
-  assert.equal(snapshot.saveVersion, 4);
+  assert.equal(snapshot.saveVersion, 5);
   assert.equal(snapshot.location, 'business');
   assert.equal(snapshot.servicePrice, 650);
   assert.equal(snapshot.documents.vodokanal, true);

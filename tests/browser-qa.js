@@ -1,6 +1,8 @@
 import { createServer } from 'vite';
 import puppeteer from 'puppeteer-core';
 import fs from 'node:fs';
+import { existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -12,7 +14,32 @@ if (!fs.existsSync(SCREENSHOT_DIR)) {
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
 }
 
-const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+function resolveChromePath() {
+  const candidates = [
+    process.env.CHROME_PATH,
+    process.env.PUPPETEER_EXECUTABLE_PATH,
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/google-chrome',
+    '/opt/google/chrome/chrome',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+  ].filter(Boolean);
+
+  const explicit = candidates.find((candidate) => existsSync(candidate));
+  if (explicit) return explicit;
+
+  for (const command of ['chromium', 'chromium-browser', 'google-chrome', 'chrome']) {
+    const result = spawnSync(process.platform === 'win32' ? 'where' : 'which', [command], { encoding: 'utf8' });
+    const found = result.status === 0 ? result.stdout.split(/\\r?\\n/).find(Boolean) : null;
+    if (found && existsSync(found.trim())) return found.trim();
+  }
+
+  throw new Error('Chrome/Chromium не найден. Установите браузер или задайте CHROME_PATH=/путь/к/chrome.');
+}
+
+const CHROME_PATH = resolveChromePath();
 
 async function runBrowserQA() {
   console.log('=== ЗАПУСК BROWSER QA ДЛЯ "АВТОМОЙКА: БИЗНЕС НА ГРАНИ" ===\n');
