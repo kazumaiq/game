@@ -3208,3 +3208,34 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
  .menu-screen-premium::before,.menu-screen-premium::after,.menu-screen-premium .menu-title,.menu-screen-premium .menu-brand-mark span,.menu-screen-premium .menu-scene-caption,.menu-screen-premium .menu-btn-primary { animation:none !important; }
  .menu-screen-premium .menu-btn-premium { transition:none !important; }
 }
+
+
+/* Career achievement track: compact on mobile, rewarding but not noisy */
+.career-achievements-section { margin-top: 18px; }
+.career-achievements-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:10px; margin: 4px 0 12px; }
+.career-achievements-heading > div > span { color:#67dff0; font-size:9px; font-weight:900; letter-spacing:.15em; }
+.career-achievements-heading h3 { margin:4px 0 0; color:#f2f8ff; font-size:18px; }
+.career-achievements-heading > strong { color:#d8b4fe; font-size:13px; white-space:nowrap; }
+.career-achievements-list { display:grid; gap:9px; }
+.career-achievement-card { padding:12px; border:1px solid rgba(100,145,180,.2); border-radius:14px; background:linear-gradient(135deg,rgba(14,27,45,.92),rgba(7,15,28,.86)); transition:border-color .2s ease, background .2s ease; }
+.career-achievement-card.is-unlocked { border-color:rgba(52,211,153,.42); background:linear-gradient(135deg,rgba(5,54,48,.42),rgba(7,15,28,.9)); }
+.career-achievement-main { display:flex; align-items:center; gap:9px; }
+.career-achievement-icon { display:grid; place-items:center; flex:0 0 34px; height:34px; border-radius:11px; background:rgba(56,189,248,.1); border:1px solid rgba(56,189,248,.19); color:#7dd3fc; font-size:16px; font-weight:900; }
+.career-achievement-card.is-unlocked .career-achievement-icon { color:#6ee7b7; background:rgba(16,185,129,.12); border-color:rgba(52,211,153,.28); }
+.career-achievement-copy { flex:1; min-width:0; }
+.career-achievement-copy strong { color:#edf6ff; font-size:12px; line-height:1.3; }
+.career-achievement-copy p { margin:3px 0 0; color:#91a7be; font-size:10px; line-height:1.4; }
+.career-achievement-reward { flex:0 0 auto; color:#80edc4; font-size:10px; font-weight:800; white-space:nowrap; }
+.career-achievement-progress { display:flex; justify-content:space-between; gap:8px; margin-top:10px; color:#91a7be; font-size:9px; }
+.career-achievement-progress span:last-child { color:#7dd3fc; font-weight:800; letter-spacing:.04em; }
+.career-achievement-card.is-unlocked .career-achievement-progress span:last-child { color:#6ee7b7; }
+.career-achievement-track { height:4px; margin-top:6px; border-radius:99px; background:rgba(100,116,139,.22); overflow:hidden; }
+.career-achievement-track > span { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,#38bdf8,#8b5cf6); transition:width .35s ease; }
+.career-achievement-card.is-unlocked .career-achievement-track > span { background:linear-gradient(90deg,#34d399,#a7f3d0); }
+@media (max-width:460px) {
+  .career-achievements-heading h3 { font-size:16px; }
+  .career-achievement-card { padding:10px; }
+  .career-achievement-icon { flex-basis:30px; height:30px; }
+  .career-achievement-copy strong { font-size:11px; }
+  .career-achievement-reward { font-size:9px; }
+}
