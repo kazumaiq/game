@@ -1236,7 +1236,7 @@ export default class CarWashScene extends Phaser.Scene {
   }
 
   _showCoffeeSteamBurst(x, y) {
-    const burst = this.add.particles(x, y, 'particle', {
+    const burst = this.add.particles(x, y, 'particle_mist', {
       speed: { min: 18, max: 48 }, angle: { min: 230, max: 310 },
       scale: { start: 0.6, end: 0 }, alpha: { start: 0.75, end: 0 },
       lifespan: 520, quantity: 8, tint: [0xffd7a0, 0xfff0d0], emitting: false,
