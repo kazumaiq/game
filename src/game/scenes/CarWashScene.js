@@ -80,7 +80,10 @@ export default class CarWashScene extends Phaser.Scene {
       this._tutorialSystem.start(this);
     }
 
-    this._onStateChanged = () => updateHUD();
+    this._onStateChanged = () => {
+      updateHUD();
+      this._updateUpgradeVisuals();
+    };
     gameState.on('stateChanged', this._onStateChanged);
 
     this.scale.on('resize', this._handleResize, this);
@@ -164,11 +167,62 @@ export default class CarWashScene extends Phaser.Scene {
     this._createAmbientLighting();
     this._createScenery();
     this._createCityDetails();
+    this._createUpgradeVisuals();
 
     this.physics.world.setBounds(20, 170, WORLD.width - 40, WORLD.height - 210);
     this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
   }
 
+
+  /**
+   * Visual feedback for purchased upgrades, using lightweight graphics only.
+   * No gameplay values are changed here; GameState remains the source of truth.
+   */
+  _createUpgradeVisuals() {
+    this._upgradeVisuals = this.add.graphics().setDepth(7.6);
+    this._updateUpgradeVisuals();
+  }
+
+  _updateUpgradeVisuals() {
+    if (!this._upgradeVisuals) return;
+    const g = this._upgradeVisuals;
+    g.clear();
+
+    const levels = [
+      Math.min(3, gameState.upgrades.washSpeed || 0),
+      Math.min(3, gameState.upgrades.equipmentQuality || 0),
+      Math.min(3, gameState.upgrades.reliability || 0),
+    ];
+    const colors = [0x38bdf8, 0xfbbf24, 0x4ade80];
+
+    // Tiny status lamps on each bay's fascia make equipment upgrades visible in-world.
+    for (const pos of WORLD.posts) {
+      g.fillStyle(0x07111d, 0.9);
+      g.fillRoundedRect(pos.x - 39, pos.y - 82, 78, 13, 3);
+      g.lineStyle(1, 0x64748b, 0.58);
+      g.strokeRoundedRect(pos.x - 39, pos.y - 82, 78, 13, 3);
+      let offset = pos.x - 29;
+      for (let group = 0; group < levels.length; group++) {
+        for (let led = 0; led < 3; led++) {
+          const active = led < levels[group];
+          g.fillStyle(colors[group], active ? 0.95 : 0.15);
+          g.fillRoundedRect(offset + led * 7, pos.y - 78, 4, 5, 1);
+          if (active) {
+            g.fillStyle(colors[group], 0.12);
+            g.fillCircle(offset + led * 7 + 2, pos.y - 75.5, 5);
+          }
+        }
+        offset += 22;
+      }
+    }
+
+    // Capacity upgrade is represented by additional illuminated queue markers.
+    const capacityLevel = Math.min(3, gameState.upgrades.capacity || 0);
+    for (let i = 0; i < 3; i++) {
+      g.fillStyle(i < capacityLevel ? 0x4ade80 : 0x64748b, i < capacityLevel ? 0.8 : 0.22);
+      g.fillRoundedRect(100 + i * 13, 462, 8, 3, 1);
+    }
+  }
 
   /**
    * A clear, lightweight office entrance layered onto the existing building art.
