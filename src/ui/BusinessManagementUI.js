@@ -64,7 +64,7 @@ function render() {
             const owned = item.max ? level >= item.max : level > 0;
             return card({ icon:item.icon, name:item.name, desc:item.desc, stock:undefined, price:owned ? `Куплено ${level}/${item.max || 1}` : money(item.cost), action:`upgrade:${item.id}`, disabled:owned || gameState.money < item.cost });
           }).join('')
-        : `<div class="bm-city-map">
+        : activeTab === 'orders' ? ['detailing','tireService','sto','coffeeShop'].map(id => { const labels = {detailing:'Детейлинг',tireService:'Шиномонтаж',sto:'СТО',coffeeShop:'Кофейня'}; const limits = {detailing:3,tireService:5,sto:2,coffeeShop:8}; const done = (gameState.businessOrdersToday || {})[id] || 0; const owned = (gameState.businessUpgrades || {})[id] > 0; return card({icon:'🧾',name:labels[id],desc:'Выполнено сегодня: '+done+'/'+limits[id]+'. Доход за вычетом себестоимости.',price:!owned?'Сначала открыть':done>=limits[id]?'На сегодня всё':'Выполнить заказ',action:'order:'+id,disabled:!owned || done>=limits[id]}); }).join('') : `<div class="bm-city-map">
             <div class="bm-map-road bm-map-road-h"></div><div class="bm-map-road bm-map-road-v"></div>
             <div class="bm-map-district district-home"><span>🏘️</span><b>Жилой район</b><small>${gameState.cityPlots?.residential ? 'Участок открыт' : 'Постоянные клиенты'}</small></div>
             <div class="bm-map-district district-center"><span>🏙️</span><b>Деловой центр</b><small>${gameState.cityPlots?.business ? 'Участок открыт' : 'Высокий средний чек'}</small></div>
