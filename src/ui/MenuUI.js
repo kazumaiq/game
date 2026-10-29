@@ -1,8 +1,6 @@
 /**
- * MenuUI — премиальное главное меню с тремя зонами:
- *   TOP: логотип + подзаголовок + слоган
- *   CENTER: прозрачная зона (видна Phaser сцена)
- *   BOTTOM: кнопки + настройки
+ * MenuUI — кинематографичное меню для 2.5D симулятора автомойки.
+ * Сцена остаётся видимой за стеклянными UI-панелями; действия меню доступны с клавиатуры и touch.
  */
 import FullscreenManager from '../game/systems/FullscreenManager.js';
 import saveSystem from '../game/systems/SaveSystem.js';
@@ -11,96 +9,142 @@ import { audioManager } from '../game/systems/AudioManager.js';
 let _menuElement = null;
 let _settingsModal = null;
 
+function readPreference(key, fallback) {
+  try {
+    const value = localStorage.getItem(key);
+    return value === null ? fallback : value;
+  } catch {
+    return fallback;
+  }
+}
+
+function writePreference(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function showMenu({ hasSave, onNewGame, onContinue }) {
   hideMenu();
 
   const overlay = document.getElementById('ui-overlay');
+  if (!overlay) return;
+
   const div = document.createElement('div');
-  div.className = 'menu-screen';
+  div.className = 'menu-screen menu-screen-premium';
   div.id = 'main-menu';
 
   const isFs = FullscreenManager.isFullscreen();
 
-  div.innerHTML = `
-    <div class="menu-zone menu-zone-top">
-      <div class="menu-logo-group">
-        <h1 class="menu-title">АВТОМОЙКА</h1>
-        <div class="menu-subtitle">БИЗНЕС НА ГРАНИ</div>
-        <p class="menu-tagline">Построй бизнес. Переживи конкуренцию.</p>
-      </div>
-    </div>
+  div.innerHTML = [
+    '<div class="menu-zone menu-zone-top">',
+      '<div class="menu-brand-row">',
+        '<div class="menu-brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>',
+        '<div class="menu-brand-copy"><strong>WASH / EMPIRE</strong><span>TYCOON SIMULATOR</span></div>',
+        '<span class="menu-edition-pill"><i></i> WEB EDITION</span>',
+      '</div>',
+      '<div class="menu-logo-group">',
+        '<div class="menu-eyebrow"><span class="menu-eyebrow-line"></span>СВОЙ БИЗНЕС. СВОИ ПРАВИЛА.</div>',
+        '<h1 class="menu-title">АВТОМОЙКА</h1>',
+        '<div class="menu-subtitle"><span>БИЗНЕС</span> НА ГРАНИ</div>',
+        '<p class="menu-tagline">От первого бокса до собственной сети.<br class="menu-desktop-break"> Каждый день решает, вырастешь ты или прогоришь.</p>',
+      '</div>',
+      '<div class="menu-feature-pills" aria-label="Особенности игры">',
+        '<span><i>01</i> УПРАВЛЯЙ</span>',
+        '<span><i>02</i> РАЗВИВАЙ</span>',
+        '<span><i>03</i> ВЫЖИВАЙ</span>',
+      '</div>',
+    '</div>',
 
-    <div class="menu-zone menu-zone-center"></div>
+    '<div class="menu-zone menu-zone-center" aria-hidden="true">',
+      '<div class="menu-scene-caption"><span class="menu-live-dot"></span><span>ГОРОД НЕ СПИТ</span><b>24 / 7</b></div>',
+      '<div class="menu-scene-hint"><span>WASH</span><span class="menu-scene-hint-line"></span><span>REPEAT</span></div>',
+    '</div>',
 
-    <div class="menu-zone menu-zone-bottom">
-      <div class="menu-actions">
-        <button class="menu-btn menu-btn-primary" id="menu-new-game">
-          <span class="menu-btn-icon">▶</span> НОВАЯ ИГРА
-        </button>
-        <button class="menu-btn menu-btn-secondary" id="menu-continue" ${hasSave ? '' : 'disabled'}>
-          <span class="menu-btn-icon">↻</span> ПРОДОЛЖИТЬ
-        </button>
-      </div>
-      <div class="menu-bottom-row">
-        <button class="menu-link-btn" id="menu-settings">
-          <span>⚙</span> Настройки
-        </button>
-        <button class="menu-link-btn" id="menu-fullscreen">
-          <span>${isFs ? '⊡' : '⛶'}</span> ${isFs ? 'Свернуть' : 'Полный экран'}
-        </button>
-      </div>
-      <div class="menu-version">v1.0 • 2026</div>
-    </div>
-  `;
+    '<div class="menu-zone menu-zone-bottom">',
+      '<div class="menu-control-card">',
+        '<div class="menu-control-card-top">',
+          '<div><div class="menu-control-kicker">ТВОЯ ИСТОРИЯ НАЧИНАЕТСЯ ЗДЕСЬ</div><div class="menu-control-title">Готов открыть первую мойку?</div></div>',
+          '<div class="menu-save-symbol" aria-hidden="true">↗</div>',
+        '</div>',
+        '<div class="menu-save-indicator ' + (hasSave ? 'is-saved' : 'is-empty') + '" id="menu-save-indicator">',
+          '<span class="menu-save-dot"></span>',
+          '<span id="menu-save-label">' + (hasSave ? 'СОХРАНЕНИЕ НАЙДЕНО' : 'СТАРТОВЫЙ КАПИТАЛ · 6 000 000 ₽') + '</span>',
+        '</div>',
+        '<div class="menu-actions">',
+          '<button class="menu-btn menu-btn-primary menu-btn-premium" id="menu-new-game" type="button">',
+            '<span class="menu-btn-icon menu-play-icon" aria-hidden="true">▶</span>',
+            '<span class="menu-btn-copy"><strong>НАЧАТЬ БИЗНЕС</strong><small>Выбери локацию и открой первую мойку</small></span>',
+            '<span class="menu-btn-arrow" aria-hidden="true">↗</span>',
+          '</button>',
+          '<button class="menu-btn menu-btn-secondary menu-btn-premium" id="menu-continue" type="button" ' + (hasSave ? '' : 'disabled') + '>',
+            '<span class="menu-btn-icon menu-continue-icon" aria-hidden="true">↻</span>',
+            '<span class="menu-btn-copy"><strong>ПРОДОЛЖИТЬ</strong><small>' + (hasSave ? 'Вернуться к сохранённой карьере' : 'Сохранение пока отсутствует') + '</small></span>',
+            '<span class="menu-btn-arrow" aria-hidden="true">→</span>',
+          '</button>',
+        '</div>',
+        '<div class="menu-bottom-row">',
+          '<button class="menu-link-btn" id="menu-settings" type="button"><span class="menu-link-icon" aria-hidden="true">⚙</span> Настройки</button>',
+          '<button class="menu-link-btn" id="menu-fullscreen" type="button"><span class="menu-link-icon" aria-hidden="true">' + (isFs ? '⊡' : '⛶') + '</span> ' + (isFs ? 'Свернуть' : 'Полный экран') + '</button>',
+        '</div>',
+      '</div>',
+      '<div class="menu-footer-row"><span>АВТОМОЙКА: БИЗНЕС НА ГРАНИ</span><span class="menu-version"><i></i> WEB BUILD · 2.5D</span></div>',
+    '</div>'
+  ].join('');
 
   overlay.appendChild(div);
   _menuElement = div;
 
-  // --- EVENT LISTENERS ---
   let isTransitioning = false;
+  const newGameButton = div.querySelector('#menu-new-game');
+  const continueButton = div.querySelector('#menu-continue');
 
-  document.getElementById('menu-new-game').addEventListener('click', () => {
+  newGameButton.addEventListener('click', () => {
     if (isTransitioning) return;
     isTransitioning = true;
     audioManager.ensureContext();
     audioManager.play('buttonClick');
     onNewGame();
-    // Сбрасываем через 2 сек на случай если confirm отклонён
-    setTimeout(() => { isTransitioning = false; }, 2000);
+    window.setTimeout(() => { isTransitioning = false; }, 1200);
   });
 
   if (hasSave) {
-    document.getElementById('menu-continue').addEventListener('click', () => {
+    continueButton.addEventListener('click', () => {
       if (isTransitioning) return;
       isTransitioning = true;
       audioManager.ensureContext();
       audioManager.play('buttonClick');
       onContinue();
-      setTimeout(() => { isTransitioning = false; }, 2000);
+      window.setTimeout(() => { isTransitioning = false; }, 1200);
     });
   }
 
-  // Настройки
-  document.getElementById('menu-settings').addEventListener('click', () => {
+  div.querySelector('#menu-settings').addEventListener('click', () => {
+    audioManager.ensureContext();
+    audioManager.play('buttonClick');
     _showSettings();
   });
 
-  // Полный экран
-  const fsBtn = document.getElementById('menu-fullscreen');
+  const fsBtn = div.querySelector('#menu-fullscreen');
   fsBtn.addEventListener('click', () => {
+    audioManager.ensureContext();
+    audioManager.play('buttonClick');
     FullscreenManager.toggleFullscreen((active) => {
       fsBtn.innerHTML = active
-        ? '<span>⊡</span> Свернуть'
-        : '<span>⛶</span> Полный экран';
+        ? '<span class="menu-link-icon">⊡</span> Свернуть'
+        : '<span class="menu-link-icon">⛶</span> Полный экран';
     });
   });
 
   FullscreenManager.initListeners((active) => {
-    const b = document.getElementById('menu-fullscreen');
-    if (b) {
-      b.innerHTML = active
-        ? '<span>⊡</span> Свернуть'
-        : '<span>⛶</span> Полный экран';
+    const button = document.getElementById('menu-fullscreen');
+    if (button) {
+      button.innerHTML = active
+        ? '<span class="menu-link-icon">⊡</span> Свернуть'
+        : '<span class="menu-link-icon">⛶</span> Полный экран';
     }
   });
 }
@@ -115,114 +159,105 @@ export function hideMenu() {
   if (existing) existing.remove();
 }
 
-// =================== SETTINGS MODAL ===================
 function _showSettings() {
   _hideSettings();
 
   const overlay = document.getElementById('ui-overlay');
+  if (!overlay) return;
+
   const backdrop = document.createElement('div');
-  backdrop.className = 'settings-backdrop';
+  backdrop.className = 'settings-backdrop settings-backdrop-premium';
   backdrop.id = 'settings-modal';
+  const joystickEnabled = readPreference('carwash_joystick_enabled', 'true') !== 'false';
 
-  backdrop.innerHTML = `
-    <div class="settings-panel">
-      <div class="settings-header">
-        <span class="settings-icon">⚙</span>
-        <span>Настройки</span>
-        <button class="settings-close-btn" id="settings-close">✕</button>
-      </div>
-
-      <div class="settings-body">
-        <div class="settings-group">
-          <div class="settings-label">Звук</div>
-          <div class="settings-row">
-            <span class="settings-desc">Звуковые эффекты</span>
-            <label class="settings-toggle">
-              <input type="checkbox" id="settings-sfx" ${audioManager.sfxEnabled ? 'checked' : ''} />
-              <span class="toggle-track"></span>
-            </label>
-          </div>
-          <div class="settings-row">
-            <span class="settings-desc">Громкость</span>
-            <input type="range" id="settings-volume" min="0" max="100" value="${Math.round(audioManager.masterVolume * 100)}" style="width:90px;accent-color:#38bdf8;" />
-          </div>
-          <div class="settings-row">
-            <span class="settings-desc">Музыка</span>
-            <label class="settings-toggle">
-              <input type="checkbox" id="settings-music" checked />
-              <span class="toggle-track"></span>
-            </label>
-          </div>
-        </div>
-
-        <div class="settings-group">
-          <div class="settings-label">Управление</div>
-          <div class="settings-row">
-            <span class="settings-desc">Виртуальный джойстик</span>
-            <label class="settings-toggle">
-              <input type="checkbox" id="settings-joystick" checked />
-              <span class="toggle-track"></span>
-            </label>
-          </div>
-        </div>
-
-        <div class="settings-group">
-          <div class="settings-label">Данные</div>
-          <div class="settings-row">
-            <button class="menu-btn menu-btn-danger" id="settings-reset">Сбросить сохранение</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="settings-footer">
-        Автомойка: Бизнес на грани • v1.0
-      </div>
-    </div>
-  `;
+  backdrop.innerHTML = [
+    '<div class="settings-panel settings-panel-premium" role="dialog" aria-modal="true" aria-labelledby="settings-title">',
+      '<div class="settings-header">',
+        '<span class="settings-icon">⚙</span>',
+        '<span id="settings-title">Настройки</span>',
+        '<button class="settings-close-btn" id="settings-close" type="button" aria-label="Закрыть настройки">✕</button>',
+      '</div>',
+      '<div class="settings-body">',
+        '<div class="settings-group">',
+          '<div class="settings-label">Звук</div>',
+          '<div class="settings-row">',
+            '<span class="settings-desc">Звуковые эффекты</span>',
+            '<label class="settings-toggle"><input type="checkbox" id="settings-sfx" ' + (audioManager.sfxEnabled ? 'checked' : '') + ' /><span class="toggle-track"></span></label>',
+          '</div>',
+          '<div class="settings-row settings-volume-row">',
+            '<label class="settings-desc" for="settings-volume">Громкость</label>',
+            '<input type="range" id="settings-volume" min="0" max="100" value="' + Math.round(audioManager.masterVolume * 100) + '" />',
+          '</div>',
+          '<p class="settings-note">Звуковые эффекты генерируются самой игрой. Настройки сохраняются на этом устройстве.</p>',
+        '</div>',
+        '<div class="settings-group">',
+          '<div class="settings-label">Управление</div>',
+          '<div class="settings-row">',
+            '<span class="settings-desc">Виртуальный джойстик</span>',
+            '<label class="settings-toggle"><input type="checkbox" id="settings-joystick" ' + (joystickEnabled ? 'checked' : '') + ' /><span class="toggle-track"></span></label>',
+          '</div>',
+          '<p class="settings-note">Можно отключить экранный джойстик и играть с клавиатуры на компьютере.</p>',
+        '</div>',
+        '<div class="settings-group settings-danger-group">',
+          '<div class="settings-label">Данные игры</div>',
+          '<button class="menu-btn menu-btn-danger" id="settings-reset" type="button">Сбросить сохранение</button>',
+          '<p class="settings-note">Удаление локального сохранения нельзя отменить.</p>',
+        '</div>',
+      '</div>',
+      '<div class="settings-footer">АВТОМОЙКА · WEB EDITION</div>',
+    '</div>'
+  ].join('');
 
   overlay.appendChild(backdrop);
   _settingsModal = backdrop;
 
-  // Закрытие
-  document.getElementById('settings-close').addEventListener('click', () => {
+  backdrop.querySelector('#settings-close').addEventListener('click', () => {
     audioManager.play('buttonClick');
     _hideSettings();
   });
-  backdrop.addEventListener('click', (e) => {
-    if (e.target === backdrop) _hideSettings();
+  backdrop.addEventListener('click', event => {
+    if (event.target === backdrop) _hideSettings();
   });
 
-  // Звуковые настройки
-  const sfxToggle = document.getElementById('settings-sfx');
-  if (sfxToggle) {
-    sfxToggle.addEventListener('change', () => {
-      audioManager.toggleSFX();
-      audioManager.play('buttonClick');
-    });
-  }
+  backdrop.querySelector('#settings-sfx').addEventListener('change', event => {
+    const enabled = event.target.checked;
+    if (enabled !== audioManager.sfxEnabled) audioManager.toggleSFX();
+    audioManager.play('buttonClick');
+  });
 
-  const volSlider = document.getElementById('settings-volume');
-  if (volSlider) {
-    volSlider.addEventListener('input', (e) => {
-      const vol = parseInt(e.target.value, 10) / 100;
-      audioManager.setVolume(vol);
-    });
-    volSlider.addEventListener('change', () => {
-      audioManager.play('buttonClick');
-    });
-  }
+  backdrop.querySelector('#settings-volume').addEventListener('input', event => {
+    audioManager.setVolume(Number(event.target.value) / 100);
+  });
 
-  // Сброс
-  document.getElementById('settings-reset').addEventListener('click', () => {
-    if (confirm('Удалить все сохранения? Это действие нельзя отменить.')) {
-      saveSystem.deleteSave();
-      _hideSettings();
-      // Обновляем состояние кнопки «Продолжить»
-      const contBtn = document.getElementById('menu-continue');
-      if (contBtn) {
-        contBtn.disabled = true;
-      }
+  backdrop.querySelector('#settings-joystick').addEventListener('change', event => {
+    const enabled = event.target.checked;
+    writePreference('carwash_joystick_enabled', enabled ? 'true' : 'false');
+    const zone = document.getElementById('joystick-zone');
+    if (zone) zone.style.display = enabled ? '' : 'none';
+    audioManager.play('buttonClick');
+  });
+
+  backdrop.querySelector('#settings-reset').addEventListener('click', () => {
+    if (!confirm('Удалить сохранение игры на этом устройстве? Это действие нельзя отменить.')) return;
+
+    saveSystem.deleteSave();
+    const continueBtn = document.getElementById('menu-continue');
+    if (continueBtn) {
+      continueBtn.disabled = true;
+      const copy = continueBtn.querySelector('.menu-btn-copy small');
+      if (copy) copy.textContent = 'Сохранение пока отсутствует';
     }
+
+    const indicator = document.getElementById('menu-save-indicator');
+    const label = document.getElementById('menu-save-label');
+    if (indicator) {
+      indicator.classList.remove('is-saved');
+      indicator.classList.add('is-empty');
+    }
+    if (label) label.textContent = 'СТАРТОВЫЙ КАПИТАЛ · 6 000 000 ₽';
+
+    audioManager.play('buttonClick');
+    _hideSettings();
   });
 }
 
