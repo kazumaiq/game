@@ -38,6 +38,13 @@ class GameState {
 
     // Запасы автохимии (число моек)
     this.suppliesStock = 50;
+    this.chemistryStock = { basic: 50, proFoam: 0, wheelCleaner: 0, wax: 0, ceramic: 0, interior: 0 };
+    this.activeServicePackage = 'standard';
+    this.unlockedServices = ['wash'];
+    this.businessUpgrades = { extraBay: 0, waterFilter: 0, dryer: 0, chemicalDoser: 0, detailing: 0, tireService: 0, sto: 0, coffeeShop: 0 };
+    this.cityPlots = { roadside: true, residential: false, business: false, industrial: false };
+    this.weather = 'clear';
+    this.customerSegments = { regular: 0, taxi: 0, premium: 0, fleet: 0 };
 
     this.upgrades = {};
     for (const key of Object.keys(BALANCE.upgrades)) {
@@ -87,7 +94,7 @@ class GameState {
       sfxVolume: 0.7,
     };
 
-    this.saveVersion = 5;
+    this.saveVersion = 6;
     this.shiftEndProcessing = false;
   }
 
@@ -167,6 +174,7 @@ class GameState {
     if (this.money < cost) return { success: false, reason: 'Недостаточно средств' };
     this.money -= cost;
     this.suppliesStock += 50;
+    this.chemistryStock.basic = (this.chemistryStock.basic || 0) + 50;
     this.stats.totalExpenses += cost;
     this.stats.todayExpenses += cost;
     this._logFinance('expense', 'Закупка автохимии (50 комплектов)', cost);
@@ -180,18 +188,32 @@ class GameState {
     if (!car || car.paid) return 0;
 
     const carClass = BALANCE.carClasses[car.carClass];
-    const price = Math.round(this.servicePrice * carClass.priceMultiplier);
+    const packageDefs = {
+      standard: { surcharge: 0, chemistry: 'basic', costMult: 1 },
+      foam: { surcharge: 250, chemistry: 'proFoam', costMult: 1.35 },
+      wax: { surcharge: 450, chemistry: 'wax', costMult: 1.6 },
+      ceramic: { surcharge: 1800, chemistry: 'ceramic', costMult: 2.5 },
+      interior: { surcharge: 700, chemistry: 'interior', costMult: 1.8 },
+    };
+    const servicePackage = packageDefs[this.activeServicePackage] || packageDefs.standard;
+    const price = Math.round((this.servicePrice + servicePackage.surcharge) * carClass.priceMultiplier);
     const supplyCostMult = this.getUpgradeEffect('supplyEfficiency', 1);
     const supplyCost = Math.round(
-      BALANCE.services.expressWash.supplyCost * carClass.supplyCostMultiplier * supplyCostMult
+      BALANCE.services.expressWash.supplyCost * carClass.supplyCostMultiplier * supplyCostMult * servicePackage.costMult
     );
+    const chemistryKey = servicePackage.chemistry;
+    const hasChemistry = (this.chemistryStock[chemistryKey] || 0) > 0 || (chemistryKey === 'basic' && this.suppliesStock > 0);
+    if (!hasChemistry) {
+      this.changeReputation(-1);
+      this.emit('stateChanged');
+      return 0;
+    }
+    if (this.chemistryStock[chemistryKey] > 0) this.chemistryStock[chemistryKey]--;
+    if (chemistryKey === 'basic' && this.suppliesStock > 0) this.suppliesStock--;
+
 
     this.money += price;
     this.money -= supplyCost;
-
-    if (this.suppliesStock > 0) {
-      this.suppliesStock--;
-    }
 
     car.paid = true;
     car.completed = true;
@@ -268,6 +290,70 @@ class GameState {
     // Проверка пройдена
     this.changeReputation(5);
     return { passed: true, insp, docDef };
+  }
+
+  /** Выбор пакета обслуживания влияет на цену и расход химии. */
+  setServicePackage(packageId) {
+    const packages = {
+      standard: { surcharge: 0, name: 'Стандарт', chemistry: 'basic' },
+      foam: { surcharge: 250, name: 'Активная пена PRO', chemistry: 'proFoam' },
+      wax: { surcharge: 450, name: 'Мойка + воск', chemistry: 'wax' },
+      ceramic: { surcharge: 1800, name: 'Керамическая защита', chemistry: 'ceramic' },
+      interior: { surcharge: 700, name: 'Комплекс с салоном', chemistry: 'interior' },
+    };
+    const def = packages[packageId];
+    if (!def) return { success: false, reason: 'Пакет не найден' };
+    if (packageId !== 'standard' && !(this.chemistryStock[def.chemistry] > 0)) return { success: false, reason: 'Нет нужной химии на складе' };
+    this.activeServicePackage = packageId;
+    this.emit('stateChanged');
+    return { success: true, package: def };
+  }
+
+  /** Приобретение оборудования и открытие новых направлений бизнеса. */
+  buyBusinessUpgrade(upgradeId) {
+    const catalog = {
+      extraBay: { name: 'Дополнительный пост', cost: 850000, max: 2 },
+      waterFilter: { name: 'Система фильтрации воды', cost: 240000, max: 1 },
+      dryer: { name: 'Автоматическая сушка', cost: 380000, max: 1 },
+      chemicalDoser: { name: 'Автоматический дозатор химии', cost: 290000, max: 1 },
+      detailing: { name: 'Студия детейлинга', cost: 1200000, max: 1, service: 'detailing' },
+      tireService: { name: 'Шиномонтаж', cost: 950000, max: 1, service: 'tireService' },
+      sto: { name: 'СТО: ремонтный бокс', cost: 2200000, max: 1, service: 'sto' },
+      coffeeShop: { name: 'Кофейня для клиентов', cost: 550000, max: 1, service: 'coffeeShop' },
+    };
+    const def = catalog[upgradeId];
+    if (!def) return { success: false, reason: 'Объект не найден' };
+    const level = this.businessUpgrades[upgradeId] || 0;
+    if (level >= def.max) return { success: false, reason: 'Уже приобретено максимум улучшений' };
+    if (this.money < def.cost) return { success: false, reason: 'Недостаточно средств' };
+    this.money -= def.cost;
+    this.businessUpgrades[upgradeId] = level + 1;
+    if (def.service && !this.unlockedServices.includes(def.service)) this.unlockedServices.push(def.service);
+    this.stats.totalExpenses += def.cost;
+    this.stats.todayExpenses += def.cost;
+    this._logFinance('expense', `Развитие бизнеса: ${def.name}`, def.cost);
+    this.emit('stateChanged');
+    return { success: true, upgrade: def, level: level + 1 };
+  }
+
+  /** Покупка участка на карте города. */
+  buyCityPlot(plotId) {
+    const catalog = {
+      residential: { name: 'Жилой район', cost: 1800000 },
+      business: { name: 'Деловой центр', cost: 3200000 },
+      industrial: { name: 'Промзона', cost: 1400000 },
+    };
+    const def = catalog[plotId];
+    if (!def) return { success: false, reason: 'Участок не найден' };
+    if (this.cityPlots[plotId]) return { success: false, reason: 'Участок уже открыт' };
+    if (this.money < def.cost) return { success: false, reason: 'Недостаточно средств' };
+    this.money -= def.cost;
+    this.cityPlots[plotId] = true;
+    this.stats.totalExpenses += def.cost;
+    this.stats.todayExpenses += def.cost;
+    this._logFinance('expense', `Покупка участка: ${def.name}`, def.cost);
+    this.emit('stateChanged');
+    return { success: true, plot: def };
   }
 
   /** Покупка улучшения */
@@ -654,6 +740,13 @@ class GameState {
       equipmentType: this.equipmentType,
       documents: { ...this.documents },
       suppliesStock: this.suppliesStock,
+      chemistryStock: { ...this.chemistryStock },
+      activeServicePackage: this.activeServicePackage,
+      unlockedServices: [...this.unlockedServices],
+      businessUpgrades: { ...this.businessUpgrades },
+      cityPlots: { ...this.cityPlots },
+      weather: this.weather,
+      customerSegments: { ...this.customerSegments },
       reputation: this.reputation,
       upgrades: { ...this.upgrades },
       employees: this.employees.map(e => ({ ...e })),
@@ -698,6 +791,13 @@ class GameState {
     if (typeof data.suppliesStock === 'number') {
       this.suppliesStock = data.suppliesStock;
     }
+    if (data.chemistryStock && typeof data.chemistryStock === 'object') this.chemistryStock = { ...this.chemistryStock, ...data.chemistryStock };
+    if (typeof data.activeServicePackage === 'string') this.activeServicePackage = data.activeServicePackage;
+    if (Array.isArray(data.unlockedServices)) this.unlockedServices = [...new Set(['wash', ...data.unlockedServices])];
+    if (data.businessUpgrades && typeof data.businessUpgrades === 'object') this.businessUpgrades = { ...this.businessUpgrades, ...data.businessUpgrades };
+    if (data.cityPlots && typeof data.cityPlots === 'object') this.cityPlots = { ...this.cityPlots, ...data.cityPlots };
+    if (['clear', 'rain', 'snow'].includes(data.weather)) this.weather = data.weather;
+    if (data.customerSegments && typeof data.customerSegments === 'object') this.customerSegments = { ...this.customerSegments, ...data.customerSegments };
 
     this.reputation = typeof data.reputation === 'number' ?
       Math.max(BALANCE.reputation.min, Math.min(BALANCE.reputation.max, data.reputation)) :
