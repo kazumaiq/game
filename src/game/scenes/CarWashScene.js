@@ -68,6 +68,11 @@ export default class CarWashScene extends Phaser.Scene {
     this._sprayGfx = this.add.graphics();
     this._sprayGfx.setDepth(22);
 
+    // One shared lightweight canvas layer tracks waiting-customer patience without
+    // creating dozens of per-car DOM elements or particle emitters.
+    this._queueMoodGfx = this.add.graphics().setDepth(20.4);
+    this._queueMoodUpdateTimer = 0;
+
     this._storySystem = new StorySystem();
     this._tutorialSystem = tutorialSystem;
 
@@ -1446,6 +1451,32 @@ export default class CarWashScene extends Phaser.Scene {
     }
   }
 
+  _updateQueueMood() {
+    if (!this._queueMoodGfx) return;
+    const gfx = this._queueMoodGfx;
+    gfx.clear();
+    const coffeeActive = this._coffeeRushUntil > this.time.now;
+    for (const carId of gameState.queue) {
+      const car = gameState.getCar(carId);
+      const sprite = this._carSprites[carId];
+      if (!car || !sprite || !sprite.active) continue;
+      const patience = Math.max(1, Number(car.patience) || 1);
+      const ratio = Phaser.Math.Clamp(1 - (car.waitTime || 0) / patience, 0, 1);
+      const x = sprite.x - 18;
+      const y = sprite.y - 27;
+      const color = coffeeActive ? 0x34d399 : ratio < 0.25 ? 0xfb7185 : ratio < 0.5 ? 0xfbbf24 : 0x38bdf8;
+      gfx.fillStyle(0x020817, 0.84);
+      gfx.fillRoundedRect(x - 1, y - 1, 38, 7, 3);
+      gfx.lineStyle(1, color, coffeeActive ? 0.8 : 0.42);
+      gfx.strokeRoundedRect(x - 1, y - 1, 38, 7, 3);
+      if (ratio > 0) {
+        const alpha = ratio < 0.25 && !coffeeActive ? 0.62 + (Math.sin(this.time.now * 0.018) + 1) * 0.19 : 0.95;
+        gfx.fillStyle(color, alpha);
+        gfx.fillRoundedRect(x + 1, y + 1, Math.max(2, 34 * ratio), 3, 2);
+      }
+    }
+  }
+
   _processPatience(delta) {
     // While the coffee amenity is active, queued customers pause their patience timer.
     if (this._coffeeRushUntil > this.time.now) return;
@@ -1748,6 +1779,11 @@ export default class CarWashScene extends Phaser.Scene {
 
     this._processQueue();
     this._processPatience(delta);
+    this._queueMoodUpdateTimer += delta;
+    if (this._queueMoodUpdateTimer >= 180) {
+      this._queueMoodUpdateTimer = 0;
+      this._updateQueueMood();
+    }
     this._processEmployees(delta);
 
     this._shiftTimer += delta;
@@ -2116,6 +2152,10 @@ export default class CarWashScene extends Phaser.Scene {
 
     if (this._sprayGfx) {
       this._sprayGfx.destroy();
+    }
+    if (this._queueMoodGfx) {
+      this._queueMoodGfx.destroy();
+      this._queueMoodGfx = null;
     }
 
     if (this._touchControlsRoot) {
