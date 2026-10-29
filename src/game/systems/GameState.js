@@ -16,6 +16,8 @@ const CAREER_ACHIEVEMENTS = [
   { id: 'twentyfive_washes', title: 'Мастер смены', description: 'Обслужи 25 автомобилей за карьеру', metric: 'totalCarsWashed', target: 25, reward: 25000 },
   { id: 'perfect_five', title: 'Чистая работа', description: 'Получи 5 оценок за идеальную мойку', metric: 'totalPerfectWashes', target: 5, reward: 10000 },
   { id: 'perfect_twenty', title: 'Стандарт премиум', description: 'Получи 20 оценок за идеальную мойку', metric: 'totalPerfectWashes', target: 20, reward: 40000 },
+  { id: 'perfect_streak_3', title: 'На волне качества', description: 'Сделай 3 идеальные мойки подряд', metric: 'bestPerfectWashStreak', target: 3, reward: 7500 },
+  { id: 'perfect_streak_6', title: 'Золотая серия', description: 'Сделай 6 идеальных моек подряд', metric: 'bestPerfectWashStreak', target: 6, reward: 20000 },
   { id: 'third_bay', title: 'Больше мощности', description: 'Открой третий моечный бокс', metric: 'openBays', target: 3, reward: 15000 },
   { id: 'four_bays', title: 'Своя мини-сеть', description: 'Открой все 4 моечных бокса', metric: 'openBays', target: 4, reward: 50000 },
   { id: 'reputation_75', title: 'Имя на районе', description: 'Подними репутацию до 75', metric: 'reputation', target: 75, reward: 12000 },
@@ -40,6 +42,8 @@ class GameState {
     this.equipmentType = 'used'; // 'used', 'newStandard', 'premiumAuto'
     this.reputation = BALANCE.reputation.initial;
     this.achievements = {};
+    this.perfectWashStreak = 0;
+    this.bestPerfectWashStreak = 0;
 
     // Оформленные документы
     this.documents = {
@@ -222,12 +226,27 @@ class GameState {
     this._logFinance('income', `Мойка ${carClass.name}`, price);
     this._logFinance('expense', `Материалы (${carClass.name})`, supplyCost);
 
+    let streakBonus = 0;
     if (quality >= 0.85) {
       this.stats.todayPerfectWashes++;
       this.stats.totalPerfectWashes = (this.stats.totalPerfectWashes || 0) + 1;
+      this.perfectWashStreak = (this.perfectWashStreak || 0) + 1;
+      this.bestPerfectWashStreak = Math.max(this.bestPerfectWashStreak || 0, this.perfectWashStreak);
+      car.perfectWashStreak = this.perfectWashStreak;
+      if (this.perfectWashStreak % 3 === 0) {
+        streakBonus = Math.min(2500, (this.perfectWashStreak / 3) * 500);
+        this.money += streakBonus;
+        this.stats.totalRevenue += streakBonus;
+        this.stats.todayRevenue += streakBonus;
+        this._logFinance('income', 'Серия идеальных моек ×' + this.perfectWashStreak, streakBonus);
+        car.perfectStreakBonus = streakBonus;
+        this.emit('perfectStreakBonus', { streak: this.perfectWashStreak, bonus: streakBonus, carId });
+      }
       this.changeReputation(BALANCE.reputation.goodServiceBonus);
-    } else if (quality < 0.5) {
-      this.changeReputation(BALANCE.reputation.poorServicePenalty);
+    } else {
+      this.perfectWashStreak = 0;
+      car.perfectWashStreak = 0;
+      if (quality < 0.5) this.changeReputation(BALANCE.reputation.poorServicePenalty);
     }
 
     this._checkCareerAchievements();
@@ -729,6 +748,8 @@ class GameState {
       suppliesStock: this.suppliesStock,
       reputation: this.reputation,
       achievements: { ...this.achievements },
+      perfectWashStreak: this.perfectWashStreak,
+      bestPerfectWashStreak: this.bestPerfectWashStreak,
       upgrades: { ...this.upgrades },
       employees: this.employees.map(e => ({ ...e })),
       servicePrice: this.servicePrice,
@@ -803,6 +824,8 @@ class GameState {
     this.buyoutAccepted = !!data.buyoutAccepted;
 
     if (data.achievements && typeof data.achievements === 'object') this.achievements = { ...data.achievements };
+    this.perfectWashStreak = Math.max(0, Math.floor(Number(data.perfectWashStreak) || 0));
+    this.bestPerfectWashStreak = Math.max(this.perfectWashStreak, Math.floor(Number(data.bestPerfectWashStreak) || 0));
     if (data.settings) this.settings = { ...this.settings, ...data.settings };
     if (Array.isArray(data.posts)) {
       for (const savedPost of data.posts) {
