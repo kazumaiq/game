@@ -12,6 +12,13 @@ function fmt(n) {
   return n.toLocaleString('ru-RU') + ' ₽';
 }
 
+function effectLabel(key, value) {
+  if (key === 'washSpeed' || key === 'supplyEfficiency' || key === 'reliability') return Math.round(value * 100) + '%';
+  if (key === 'equipmentQuality') return '×' + Number(value).toFixed(1);
+  if (key === 'capacity') return String(value) + ' машин';
+  return String(value);
+}
+
 export function showUpgradePanel() {
   const existing = document.querySelector('#upgrade-panel-overlay');
   if (existing) { existing.remove(); return; }
@@ -30,12 +37,16 @@ export function showUpgradePanel() {
     const isMax = curLevel >= upgrade.maxLevel;
     const nextPrice = !isMax ? upgrade.prices[curLevel] : null;
     const canAfford = !isMax && gameState.money >= nextPrice;
+    const currentEffect = curLevel > 0 ? upgrade.effects[curLevel - 1] : (key === 'capacity' ? BALANCE.customer.maxQueueSize : 1);
+    const nextEffect = !isMax ? upgrade.effects[curLevel] : null;
+    const effectText = key === 'washSpeed' ? 'Время этапа' : key === 'equipmentQuality' ? 'Качество мойки' : key === 'reliability' ? 'Риск поломки' : key === 'capacity' ? 'Лимит очереди' : 'Расход материалов';
 
     itemsHtml += `
       <div class="upgrade-item">
         <div class="upgrade-info">
           <div class="name">${upgrade.name}</div>
           <div class="desc">${upgrade.description}</div>
+          <div class="upgrade-effect">${effectText}: <strong>${effectLabel(key, currentEffect)}</strong>${!isMax ? ' → <strong>' + effectLabel(key, nextEffect) + '</strong>' : ''}</div>
           <div class="level">Уровень: ${curLevel} / ${upgrade.maxLevel}</div>
           <div class="upgrade-level-track"><span style="width:${Math.round(curLevel / upgrade.maxLevel * 100)}%"></span></div>
         </div>
