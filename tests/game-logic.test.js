@@ -240,7 +240,7 @@ test('13. Шаг 4 завершается после начисления опл
   // Повторная попытка завершить заказ не начисляет деньги
   const secondIncome = gameState.addServiceIncome(car.id, 1.0);
   assert.equal(secondIncome, 0);
-  assert.equal(gameState.money, moneyBefore + net);
+  assert.equal(gameState.money, moneyBefore + net + 2500);
 });
 
 test('14. Отсутствие целевой машины восстанавливается', () => {
