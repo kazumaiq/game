@@ -473,6 +473,7 @@ class GameState {
 
     stored.claimed = true;
     this.money += stored.reward;
+    this.stats.totalRevenue += stored.reward;
     this._logFinance('income', `Награда за контракт «${stored.title}»`, stored.reward);
     this.emit('stateChanged');
 
