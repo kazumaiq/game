@@ -84,6 +84,7 @@ function render() {
       <button data-tab="stock" class="${activeTab==='stock'?'active':''}">📦 Склад</button>
       <button data-tab="services" class="${activeTab==='services'?'active':''}">🚿 Услуги</button>
       <button data-tab="equipment" class="${activeTab==='equipment'?'active':''}">⚙️ Развитие</button>
+      <button data-tab="orders" class="${activeTab==='orders'?'active':''}">🧾 Заказы</button>
       <button data-tab="city" class="${activeTab==='city'?'active':''}">🗺️ Карта</button>
     </nav>
     <div class="bm-content">${content}</div>
