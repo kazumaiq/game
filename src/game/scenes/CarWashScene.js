@@ -88,6 +88,12 @@ export default class CarWashScene extends Phaser.Scene {
       this._updateUpgradeVisuals();
     };
     gameState.on('stateChanged', this._onStateChanged);
+    this._onAchievementUnlocked = (achievement) => {
+      audioManager.play('success');
+      showToast(`🏆 ${achievement.title} · +${this._formatMoney(achievement.reward)}`, 'success');
+      if (this.player) this._spawnCleanSparkles(this.player.x, this.player.y - 20);
+    };
+    gameState.on('achievementUnlocked', this._onAchievementUnlocked);
 
     this.scale.on('resize', this._handleResize, this);
     this._handleResize({ width: this.scale.width, height: this.scale.height });
@@ -154,11 +160,11 @@ export default class CarWashScene extends Phaser.Scene {
       if (postData.unlocked === false) sprite.setAlpha(0.16);
 
       const label = this.add.text(pos.x, pos.y - (compactExpansion ? 76 : 112),
-        postData.unlocked === false ? `🔒 ${pos.label} • ЗАКРЫТ` : `${pos.label} • СВОБОДЕН`, {
-        fontSize: '16px',
+        postData.unlocked === false ? `${pos.label.toUpperCase()} · ЗАКРЫТ` : `${pos.label.toUpperCase()} · ГОТОВ`, {
+        fontSize: compactExpansion ? '9px' : '11px',
         color: '#8df4ff',
         backgroundColor: 'rgba(5, 12, 24, 0.98)',
-        padding: { x: 12, y: 7 },
+        padding: compactExpansion ? { x: 6, y: 4 } : { x: 8, y: 4 },
         fontFamily: 'Arial, Helvetica, sans-serif',
         fontStyle: 'bold',
         stroke: '#07111f',
@@ -435,6 +441,9 @@ export default class CarWashScene extends Phaser.Scene {
   _createDayCycleEffects() {
     // A subtle full-world color grade makes the passage of the shift visible
     // without changing the artwork itself. Practical lights glow brighter at dusk.
+    this._dayAtmosphere = this.add.rectangle(WORLD.width / 2, WORLD.height / 2, WORLD.width, WORLD.height, 0xffd19a, 0)
+      .setDepth(22.7)
+      .setBlendMode(Phaser.BlendModes.NORMAL);
     this._dayTint = this.add.rectangle(WORLD.width / 2, WORLD.height / 2, WORLD.width, WORLD.height, 0xffffff, 0)
       .setDepth(23)
       .setBlendMode(Phaser.BlendModes.MULTIPLY);
@@ -449,6 +458,8 @@ export default class CarWashScene extends Phaser.Scene {
     const clock = getShiftClock(gameState.shiftTimeRemaining, BALANCE.time);
     const profile = getDayCycleProfile(clock.hour);
     this._dayTint.setFillStyle(profile.tintColor, profile.tintAlpha);
+    const atmosphereAlpha = clock.hour < 9 ? 0.13 : clock.hour < 10 ? 0.075 : clock.hour >= 19 ? 0.045 : clock.hour >= 17.5 ? 0.055 : 0.018;
+    this._dayAtmosphere.setFillStyle(profile.tintColor, atmosphereAlpha);
     this.cameras.main.setBackgroundColor(profile.tintColor);
 
     const lights = this._dayLights;
@@ -708,18 +719,18 @@ export default class CarWashScene extends Phaser.Scene {
       if (!lbl) continue;
 
       if (post.unlocked === false) {
-        lbl.setText(`🔒 ${WORLD.posts[i].label} • ЗАКРЫТ`);
+        lbl.setText(`${WORLD.posts[i].label.toUpperCase()} · ЗАКРЫТ`);
         lbl.setColor('#94a3b8');
         if (this._postSprites[i]) this._postSprites[i].setAlpha(0.16);
       } else if (post.broken) {
-        lbl.setText(`⚠ ${WORLD.posts[i].label} • АВАРИЯ`);
+        lbl.setText(`${WORLD.posts[i].label.toUpperCase()} · АВАРИЯ`);
         lbl.setColor('#ef4444');
       } else if (post.busy) {
-        lbl.setText(`🚿 ${WORLD.posts[i].label} • МОЙКА`);
+        lbl.setText(`${WORLD.posts[i].label.toUpperCase()} · МОЙКА`);
         if (this._postSprites[i]) this._postSprites[i].setAlpha(1);
         lbl.setColor('#22c55e');
       } else {
-        lbl.setText(`✓ ${WORLD.posts[i].label} • СВОБОДЕН`);
+        lbl.setText(`${WORLD.posts[i].label.toUpperCase()} · ГОТОВ`);
         lbl.setColor('#38bdf8');
         if (this._postSprites[i]) this._postSprites[i].setAlpha(1);
       }
@@ -2095,6 +2106,7 @@ export default class CarWashScene extends Phaser.Scene {
     this.scale.off('resize', this._handleResize, this);
     saveSystem.stopAutoSave();
     gameState.off('stateChanged', this._onStateChanged);
+    gameState.off('achievementUnlocked', this._onAchievementUnlocked);
     destroyHUD();
     hideWashProgress();
 
