@@ -495,9 +495,18 @@ class GameState {
     this.money += stored.reward;
     this.stats.totalRevenue += stored.reward;
     this._logFinance('income', `Награда за контракт «${stored.title}»`, stored.reward);
+
+    // The third claimed daily contract unlocks a one-time bonus for this day.
+    const allClaimed = this.dailyContracts.length === 3 && this.dailyContracts.every(item => item.claimed);
+    const bonus = allClaimed ? 15000 : 0;
+    if (bonus > 0) {
+      this.money += bonus;
+      this.stats.totalRevenue += bonus;
+      this._logFinance('income', 'Бонус за все контракты дня', bonus);
+    }
     this.emit('stateChanged');
 
-    return { success: true, reward: stored.reward, title: stored.title };
+    return { success: true, reward: stored.reward, bonus, title: stored.title };
   }
 
   nextDay() {
