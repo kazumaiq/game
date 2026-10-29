@@ -132,6 +132,7 @@ export default class CarWashScene extends Phaser.Scene {
     this._building = this.add.image(WORLD.building.x, WORLD.building.y, 'wash-building-art')
       .setDisplaySize(560, 194)
       .setDepth(5);
+    this._createOfficeEntrance();
 
     this._postSprites = [];
     this._postStatusLabels = [];
@@ -168,6 +169,59 @@ export default class CarWashScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
   }
 
+
+  /**
+   * A clear, lightweight office entrance layered onto the existing building art.
+   * It is decorative only; business state remains managed by the existing UI.
+   */
+  _createOfficeEntrance() {
+    const g = this.add.graphics().setDepth(5.35);
+
+    // Recessed doorway, glass panels and a warm interior light.
+    g.fillStyle(0x050b15, 0.92);
+    g.fillRoundedRect(419, 135, 62, 57, 4);
+    g.lineStyle(2, 0x7dd3fc, 0.8);
+    g.strokeRoundedRect(419, 135, 62, 57, 4);
+    g.fillStyle(0x18364a, 0.98);
+    g.fillRoundedRect(424, 140, 52, 47, 2);
+    g.fillStyle(0xffd28a, 0.18);
+    g.fillRoundedRect(427, 143, 46, 41, 2);
+    g.lineStyle(1, 0x9eeeff, 0.55);
+    g.lineBetween(450, 141, 450, 186);
+    g.fillStyle(0xffd28a, 0.85);
+    g.fillCircle(468, 164, 2);
+
+    // Steps and a restrained cyan edge light.
+    g.fillStyle(0x172638, 1);
+    g.fillRoundedRect(412, 188, 76, 6, 2);
+    g.fillStyle(0x7dd3fc, 0.78);
+    g.fillRoundedRect(418, 188, 64, 1.5, 1);
+
+    // Compact readable office sign.
+    g.fillStyle(0x07111d, 0.96);
+    g.fillRoundedRect(409, 113, 82, 17, 3);
+    g.lineStyle(1, 0x38bdf8, 0.78);
+    g.strokeRoundedRect(409, 113, 82, 17, 3);
+    this.add.text(450, 121.5, 'УПРАВЛЕНИЕ', {
+      fontFamily: 'Arial, Helvetica, sans-serif',
+      fontSize: '8px',
+      fontStyle: 'bold',
+      color: '#e6faff',
+      letterSpacing: 1,
+    }).setOrigin(0.5).setDepth(5.45);
+
+    // A subtle ground marker makes the interaction point easy to find.
+    const marker = this.add.ellipse(450, 198, 46, 12, 0x38bdf8, 0.12).setDepth(5.1);
+    this.tweens.add({
+      targets: marker,
+      alpha: { from: 0.12, to: 0.32 },
+      scaleX: { from: 0.9, to: 1.12 },
+      duration: 1100,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.inOut',
+    });
+  }
 
   /**
    * Static city dressing around the playable yard.
@@ -758,6 +812,16 @@ export default class CarWashScene extends Phaser.Scene {
     if (this._isWashing) {
       btnText.textContent = 'МОЙКА';
       btnSub.textContent = 'НАЖИМАЙ';
+      return;
+    }
+
+    // Show the office action before generic bay actions when the player reaches the entrance.
+    const officeDistance = Phaser.Math.Distance.Between(
+      this.player.x, this.player.y, WORLD.building.x, WORLD.building.y + 68
+    );
+    if (officeDistance < 108) {
+      btnText.textContent = 'ОФИС';
+      btnSub.textContent = 'УПРАВЛЕНИЕ БИЗНЕСОМ';
       return;
     }
 
