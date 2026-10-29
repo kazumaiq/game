@@ -407,6 +407,7 @@ test('21. Ежедневные контракты отслеживают про�
   const reward = gameState.claimDailyContract('wash');
   assert.equal(reward.success, true);
   assert.equal(gameState.money, moneyBefore + washContract.reward);
+  assert.equal(gameState.stats.totalRevenue, washContract.reward);
   assert.equal(gameState.getDailyContracts().find(contract => contract.id === 'wash').claimed, true);
   assert.equal(gameState.claimDailyContract('wash').success, false);
 
