@@ -1398,11 +1398,16 @@ html, body {
   max-width: 580px;
 }
 .daily-contracts-header {
+  position: sticky;
+  top: -12px;
+  z-index: 21;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
-  margin-bottom: 8px;
+  margin: -8px 0 8px;
+  padding: 8px 0 10px;
+  background: rgba(15, 23, 42, 0.98);
 }
 .daily-contracts-header h2 {
   margin: 3px 0 0;
@@ -1540,10 +1545,10 @@ html, body {
   .daily-contracts-panel {
     padding: 12px;
   }
-  .daily-contracts-status {
+  .daily-contract-status {
     font-size: 7px;
   }
-  .daily-contracts-card {
+  .daily-contract-card {
     padding: 9px;
   }
   .daily-contract-title-wrap h3 {
