@@ -886,6 +886,27 @@ function _generateCar(g, key, conf, state) {
     g.fillRect(W - 32, 14, 18, H - 28);
   }
 
+  // Финальный material pass: единый контур, тонкие отражённые края и мокрые блики.
+  // Контраст остаётся мягким, чтобы автомобиль читался на маленьком экране.
+  g.lineStyle(1, 0x07101d, 0.72);
+  g.strokeRoundedRect(6.5, 6.5, W - 13, H - 13, 9);
+  g.lineStyle(1, 0xffffff, state === 'clean' ? 0.34 : (state === 'rinse' ? 0.25 : 0.1));
+  g.strokeRoundedRect(8, 8, W - 16, H - 16, 8);
+
+  // Узкие мягкие отражения в лаке и на стёклах.
+  if (state === 'clean' || state === 'rinse') {
+    g.fillStyle(0xe0f2fe, state === 'clean' ? 0.2 : 0.14);
+    g.fillRoundedRect(cabX + 8, cabY + 3, Math.max(2, cabW * 0.12), cabH * 0.42, 2);
+    g.fillStyle(0x67e8f9, 0.13);
+    g.fillRoundedRect(13, 13, Math.max(3, W * 0.08), Math.max(3, H * 0.14), 2);
+    g.fillStyle(0xffffff, state === 'clean' ? 0.25 : 0.12);
+    g.fillRoundedRect(W * 0.32, H * 0.14, W * 0.22, 1.5, 1);
+  }
+
+  // Нижний отражённый свет усиливает ощущение мокрых шин и дорожного покрытия.
+  g.fillStyle(0x38bdf8, state === 'clean' ? 0.13 : 0.06);
+  g.fillRoundedRect(W * 0.22, H - 9, W * 0.52, 1.5, 1);
+
   g.generateTexture(key, W, H);
 }
 
