@@ -140,6 +140,9 @@ export default class CarWashScene extends Phaser.Scene {
     // 5. Разметка на асфальте (дорожки, стрелки въезда/выезда, мокрые пятна)
     this._createGroundMarkings();
 
+    // 5b. Кинематографичный свет и отражения на влажном покрытии.
+    this._createAmbientLighting();
+
     // 6. Главное административное здание автомойки
     this._building = this.add.image(WORLD.building.x, WORLD.building.y, 'building_complex');
     this._building.setDepth(7);
@@ -223,6 +226,51 @@ export default class CarWashScene extends Phaser.Scene {
       backgroundColor: 'rgba(15, 23, 42, 0.85)',
       padding: { x: 6, y: 2 },
     }).setOrigin(1, 0).setDepth(4);
+  }
+
+  _createAmbientLighting() {
+    const light = this.add.graphics().setDepth(3.4);
+
+    // Мягкие бирюзовые световые лужи от оборудования моечных постов.
+    for (const pos of WORLD.posts) {
+      light.fillStyle(0x22d3ee, 0.025);
+      light.fillEllipse(pos.x, pos.y + 28, 190, 86);
+      light.fillStyle(0x22d3ee, 0.035);
+      light.fillEllipse(pos.x, pos.y + 25, 145, 62);
+      light.fillStyle(0x67e8f9, 0.045);
+      light.fillEllipse(pos.x, pos.y + 22, 92, 32);
+
+      // Длинные блики на мокром бетоне, будто отражаются световые панели.
+      light.fillStyle(0x9be7ff, 0.14);
+      light.fillRoundedRect(pos.x - 66, pos.y + 43, 38, 2, 1);
+      light.fillStyle(0x67e8f9, 0.1);
+      light.fillRoundedRect(pos.x + 19, pos.y + 55, 51, 2, 1);
+      light.fillStyle(0xffffff, 0.08);
+      light.fillRoundedRect(pos.x - 12, pos.y + 62, 21, 1, 1);
+    }
+
+    // Тёплые закатные рефлексы на дороге контрастируют с холодным светом мойки.
+    light.fillStyle(0xfb923c, 0.035);
+    light.fillEllipse(130, WORLD.roadY + 3, 150, 22);
+    light.fillEllipse(770, WORLD.roadY + 1, 180, 18);
+    light.fillStyle(0xfbbf24, 0.08);
+    light.fillRoundedRect(95, WORLD.roadY + 5, 52, 2, 1);
+    light.fillRoundedRect(720, WORLD.roadY - 4, 37, 2, 1);
+
+    // Тонкие отражения и царапины на поверхности придают покрытию масштаб.
+    light.lineStyle(1, 0xe2e8f0, 0.09);
+    light.strokeLineShape(new Phaser.Geom.Line(230, 420, 273, 418));
+    light.strokeLineShape(new Phaser.Geom.Line(520, 448, 582, 445));
+    light.strokeLineShape(new Phaser.Geom.Line(350, 530, 391, 529));
+    light.lineStyle(1, 0x67e8f9, 0.1);
+    light.strokeLineShape(new Phaser.Geom.Line(235, 352, 260, 350));
+    light.strokeLineShape(new Phaser.Geom.Line(635, 365, 673, 363));
+
+    // Небольшая тёплая подсветка у входа помогает считывать направление движения.
+    light.fillStyle(0xf59e0b, 0.045);
+    light.fillEllipse(WORLD.entrance.x + 55, WORLD.entrance.y - 35, 78, 38);
+    light.fillStyle(0x22c55e, 0.035);
+    light.fillEllipse(WORLD.exit.x - 40, WORLD.exit.y - 35, 82, 34);
   }
 
   _createScenery() {
