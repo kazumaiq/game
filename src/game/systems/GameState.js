@@ -337,6 +337,7 @@ class GameState {
       let value = 0;
       if (item.metric === 'openBays') value = openBays;
       else if (item.metric === 'reputation') value = Math.round(this.reputation);
+      else if (item.metric === 'bestPerfectWashStreak') value = Number(this.bestPerfectWashStreak) || 0;
       else value = Number(this.stats[item.metric]) || 0;
       return { ...item, progress: Math.min(item.target, value), unlocked: !!this.achievements[item.id] };
     });
