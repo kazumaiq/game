@@ -22,6 +22,8 @@ const WORLD = {
   posts: [
     { x: 300, y: 310, label: 'Бокс 1' },
     { x: 600, y: 310, label: 'Бокс 2' },
+    { x: 130, y: 402, label: 'Бокс 3', expansion: true },
+    { x: 770, y: 402, label: 'Бокс 4', expansion: true },
   ],
   queueStart: { x: 130, y: 490 },
   queueSpacing: 70,
@@ -108,10 +110,11 @@ export default class CarWashScene extends Phaser.Scene {
 
     // Keep the established, readable camera scale. The previous 0.68 zoom on
     // portrait phones made the yard tiny and pushed the player visually away.
-    let targetZoom = 1.15;
-    if (minDim < 360) targetZoom = 0.95;
-    else if (minDim < 420) targetZoom = 1.0;
-    else if (minDim < 650) targetZoom = 1.05;
+    // Slightly wider view shows more of the yard without making the player tiny.
+    let targetZoom = 1.08;
+    if (minDim < 360) targetZoom = 0.92;
+    else if (minDim < 420) targetZoom = 0.96;
+    else if (minDim < 650) targetZoom = 1.0;
 
     const cam = this.cameras.main;
     cam.setZoom(targetZoom);
@@ -143,11 +146,14 @@ export default class CarWashScene extends Phaser.Scene {
       const pos = WORLD.posts[i];
       const postData = gameState.posts[i];
       const texture = postData.broken ? 'wash-bay-broken-art' : 'wash-bay-art';
+      const compactExpansion = !!pos.expansion;
       const sprite = this.add.image(pos.x, pos.y, texture)
-        .setDisplaySize(300, 192)
+        .setDisplaySize(compactExpansion ? 176 : 300, compactExpansion ? 112 : 192)
         .setDepth(6);
+      if (postData.unlocked === false) sprite.setAlpha(0.16);
 
-      const label = this.add.text(pos.x, pos.y - 112, `${pos.label} • СВОБОДЕН`, {
+      const label = this.add.text(pos.x, pos.y - (compactExpansion ? 76 : 112),
+        postData.unlocked === false ? `🔒 ${pos.label} • ЗАКРЫТ` : `${pos.label} • СВОБОДЕН`, {
         fontSize: '16px',
         color: '#8df4ff',
         backgroundColor: 'rgba(5, 12, 24, 0.98)',
@@ -158,6 +164,7 @@ export default class CarWashScene extends Phaser.Scene {
         strokeThickness: 3,
         shadow: { offsetX: 0, offsetY: 2, color: '#000000', blur: 4, fill: true },
       }).setOrigin(0.5).setDepth(8);
+      if (postData.unlocked === false) label.setColor('#94a3b8');
 
       this._postSprites.push(sprite);
       this._postStatusLabels.push(label);
@@ -668,15 +675,21 @@ export default class CarWashScene extends Phaser.Scene {
       const lbl = this._postStatusLabels[i];
       if (!lbl) continue;
 
-      if (post.broken) {
+      if (post.unlocked === false) {
+        lbl.setText(`🔒 ${WORLD.posts[i].label} • ЗАКРЫТ`);
+        lbl.setColor('#94a3b8');
+        if (this._postSprites[i]) this._postSprites[i].setAlpha(0.16);
+      } else if (post.broken) {
         lbl.setText(`⚠ ${WORLD.posts[i].label} • АВАРИЯ`);
         lbl.setColor('#ef4444');
       } else if (post.busy) {
         lbl.setText(`🚿 ${WORLD.posts[i].label} • МОЙКА`);
+        if (this._postSprites[i]) this._postSprites[i].setAlpha(1);
         lbl.setColor('#22c55e');
       } else {
         lbl.setText(`✓ ${WORLD.posts[i].label} • СВОБОДЕН`);
         lbl.setColor('#38bdf8');
+        if (this._postSprites[i]) this._postSprites[i].setAlpha(1);
       }
     }
   }
@@ -881,6 +894,7 @@ export default class CarWashScene extends Phaser.Scene {
 
     for (let i = 0; i < gameState.posts.length; i++) {
       const post = gameState.posts[i];
+      if (post.unlocked === false) continue;
       if (post.broken) {
         const pos = WORLD.posts[i];
         const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, pos.x, pos.y);
@@ -894,6 +908,7 @@ export default class CarWashScene extends Phaser.Scene {
 
     for (let i = 0; i < gameState.posts.length; i++) {
       const post = gameState.posts[i];
+      if (post.unlocked === false) continue;
       if (post.busy && post.carId) {
         const car = gameState.getCar(post.carId);
         if (car && !car.completed && !car.paid) {
@@ -1301,6 +1316,7 @@ export default class CarWashScene extends Phaser.Scene {
   _processQueue() {
     for (let i = 0; i < gameState.posts.length; i++) {
       const post = gameState.posts[i];
+      if (post.unlocked === false) continue;
       if (!post.busy && !post.broken && gameState.queue.length > 0) {
         const carId = gameState.queue[0];
         this._moveCarToPost(carId, i);
