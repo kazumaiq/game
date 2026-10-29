@@ -26,7 +26,12 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        shell: bash
+        run: |
+          set +e
+          npm ci 2>&1 | tee npm-ci.log
+          result=${PIPESTATUS[0]}
+          exit "$result"
 
       - name: Run unit tests
         shell: bash
@@ -41,7 +46,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: unit-test-log
-          path: unit-test.log
+          path: |
+            npm-ci.log
+            unit-test.log
           if-no-files-found: warn
           retention-days: 3
 
