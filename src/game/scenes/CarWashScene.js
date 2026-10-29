@@ -1139,6 +1139,7 @@ export default class CarWashScene extends Phaser.Scene {
     this.player.setTexture('player_idle');
 
     showToast(`Готово! Клиент оплатил +${this._formatMoney(profit)}`, 'success');
+    this._showWashReward(car, profit, quality);
     this._updateCarVisual(car);
 
     const carSprite = this._carSprites[car.id];
@@ -1166,6 +1167,32 @@ export default class CarWashScene extends Phaser.Scene {
     this._washingCar = null;
     this.player.setTexture('player_idle');
     hideWashProgress();
+  }
+
+  _showWashReward(car, profit, quality) {
+    const sprite = this._carSprites[car.id];
+    if (!sprite || !sprite.active) return;
+    const perfect = quality >= 0.85;
+    const reward = this.add.container(sprite.x, sprite.y - 28).setDepth(40);
+    const bg = this.add.graphics();
+    bg.fillStyle(perfect ? 0x064e3b : 0x0b2238, 0.94);
+    bg.lineStyle(2, perfect ? 0x34d399 : 0x38bdf8, 0.9);
+    bg.fillRoundedRect(-65, -18, 130, 36, 12);
+    bg.strokeRoundedRect(-65, -18, 130, 36, 12);
+    const label = this.add.text(0, 0, (perfect ? '✦ ИДЕАЛЬНО  ' : '✓ ГОТОВО  ') + '+' + this._formatMoney(profit), {
+      fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '13px', fontStyle: 'bold',
+      color: perfect ? '#86efac' : '#a5f3fc', align: 'center',
+      stroke: '#06111f', strokeThickness: 2,
+    }).setOrigin(0.5);
+    reward.add([bg, label]);
+    this.tweens.add({ targets: reward, y: reward.y - 42, alpha: 0, duration: 1350, ease: 'Cubic.easeOut', onComplete: () => reward.destroy() });
+    if (perfect) {
+      const badge = this.add.text(sprite.x, sprite.y + 28, 'КАЧЕСТВО 85%+', {
+        fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '10px', fontStyle: 'bold',
+        color: '#86efac', backgroundColor: '#052e2b', padding: { x: 7, y: 4 },
+      }).setOrigin(0.5).setDepth(40);
+      this.tweens.add({ targets: badge, y: badge.y + 16, alpha: 0, delay: 300, duration: 900, onComplete: () => badge.destroy() });
+    }
   }
 
   _checkBreakdown(postId) {
