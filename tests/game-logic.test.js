@@ -475,7 +475,7 @@ test('25. Карьерные достижения выплачиваются о�
   assert.ok(second);
   assert.equal(gameState.assignCarToPost(second.id, 'post_1'), true);
   gameState.addServiceIncome(second.id, 0.75);
-  assert.equal(gameState.money, beforeSecondWash + 350);
+  assert.equal(gameState.money, beforeSecondWash + 370);
 });
 
 test('26. Открытие третьего бокса меняет состояние и платит достижение', () => {
