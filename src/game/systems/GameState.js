@@ -200,16 +200,21 @@ class GameState {
     return { allowed: true };
   }
 
+  getServiceDefinition(serviceId = 'expressWash') {
+    return BALANCE.services[serviceId] || BALANCE.services.expressWash;
+  }
+
   /** Доход за оказанную услугу */
   addServiceIncome(carId, quality) {
     const car = this.cars.find(c => c.id === carId);
     if (!car || car.paid || this.suppliesStock <= 0) return 0;
 
     const carClass = BALANCE.carClasses[car.carClass];
-    const price = Math.round(this.servicePrice * carClass.priceMultiplier);
+    const service = this.getServiceDefinition(car.serviceId);
+    const price = Math.round(this.servicePrice * service.priceMultiplier * carClass.priceMultiplier);
     const supplyCostMult = this.getUpgradeEffect('supplyEfficiency', 1);
     const supplyCost = Math.round(
-      BALANCE.services.expressWash.supplyCost * carClass.supplyCostMultiplier * supplyCostMult
+      service.supplyCost * carClass.supplyCostMultiplier * supplyCostMult
     );
 
     this.money += price;
@@ -429,7 +434,7 @@ class GameState {
   }
 
   /** Добавить машину в очередь */
-  addCar(carClassId) {
+  addCar(carClassId, serviceId = 'expressWash') {
     const maxQueue = this.getUpgradeEffect('capacity', BALANCE.customer.maxQueueSize);
     if (this.queue.length >= maxQueue) return null;
     if (this.cars.length >= BALANCE.customer.maxActiveCars) return null;
@@ -437,9 +442,11 @@ class GameState {
     const carClass = BALANCE.carClasses[carClassId];
     if (!carClass) return null;
 
+    const selectedServiceId = BALANCE.services[serviceId] ? serviceId : 'expressWash';
     const car = {
       id: genId('car'),
       carClass: carClassId,
+      serviceId: selectedServiceId,
       state: 'waiting',
       washStage: -1,
       washProgress: 0,

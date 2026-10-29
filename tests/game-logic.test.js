@@ -75,7 +75,19 @@ test('5. Защита от повторной оплаты и повторног
   assert.equal(gameState.stats.todayCarsWashed, carsWashedBefore);
 });
 
-test('6. Документы, инспекции и штрафы', () => {
+test('6. Варианты услуг сохраняют сервис и считают отдельную стоимость', () => {
+  gameState.initNewGame('roadside');
+  const car = gameState.addCar('sedan', 'deepWash');
+  const expectedNet = Math.round(gameState.servicePrice * 1.7) - 150;
+
+  const net = gameState.addServiceIncome(car.id, 1.0);
+
+  assert.equal(car.serviceId, 'deepWash');
+  assert.equal(net, expectedNet);
+  assert.equal(car.paid, true);
+});
+
+test('7. Документы, инспекции и штрафы', () => {
   gameState.initNewGame('roadside');
   gameState.day = 3; // День планового рейда СЭС
   gameState.documents.ses = false; // Документ не оформлен!

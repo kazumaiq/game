@@ -1135,6 +1135,10 @@ export default class CarWashScene extends Phaser.Scene {
     }
   }
 
+  _getService(car) {
+    return gameState.getServiceDefinition(car?.serviceId);
+  }
+
   _startWashing(carId) {
     const car = gameState.getCar(carId);
     if (!car || this._isWashing || car.completed) return;
@@ -1152,8 +1156,8 @@ export default class CarWashScene extends Phaser.Scene {
     audioManager.startSpray('foam');
     this.player.setTexture('player_work');
 
-    const stages = BALANCE.services.expressWash.stages;
-    const stageName = BALANCE.services.expressWash.stageNames[stages[0]];
+    const stages = this._getService(car).stages;
+    const stageName = this._getService(car).stageNames[stages[0]];
     showWashProgress(stageName, 0, 'Нажимай кнопку для нанесения пены!');
 
     if (!gameState.tutorialCompleted && gameState.tutorialStep === 1) {
@@ -1168,7 +1172,7 @@ export default class CarWashScene extends Phaser.Scene {
       return;
     }
 
-    const stages = BALANCE.services.expressWash.stages;
+    const stages = this._getService(car).stages;
     const isFoam = stages[car.washStage] === 'foam';
     audioManager.startSpray(isFoam ? 'foam' : 'water');
     audioManager.play(isFoam ? 'foamSpray' : 'rinse');
@@ -1177,7 +1181,7 @@ export default class CarWashScene extends Phaser.Scene {
       car.washProgress += 25;
       if (car.washProgress > 100) car.washProgress = 100;
 
-      const stageName = BALANCE.services.expressWash.stageNames[stages[car.washStage]];
+      const stageName = this._getService(car).stageNames[stages[car.washStage]];
       showWashProgress(stageName, car.washProgress, car.washProgress >= 100 ? 'Этап готов! Нажми для перехода' : 'Продолжай мойку!');
       this._updateCarVisual(car);
 
@@ -1190,7 +1194,7 @@ export default class CarWashScene extends Phaser.Scene {
         if (car.washStage < stages.length - 1) {
           car.washStage++;
           car.washProgress = 0;
-          const nextName = BALANCE.services.expressWash.stageNames[stages[car.washStage]];
+          const nextName = this._getService(car).stageNames[stages[car.washStage]];
           showWashProgress(nextName, 0, 'Нажимай кнопку действия!');
           this._updateCarVisual(car);
         } else {
@@ -1201,7 +1205,7 @@ export default class CarWashScene extends Phaser.Scene {
       if (car.washStage < stages.length - 1) {
         car.washStage++;
         car.washProgress = 0;
-        const nextName = BALANCE.services.expressWash.stageNames[stages[car.washStage]];
+        const nextName = this._getService(car).stageNames[stages[car.washStage]];
         showWashProgress(nextName, 0, 'Нажимай кнопку действия!');
         this._updateCarVisual(car);
       } else {
@@ -1355,7 +1359,13 @@ export default class CarWashScene extends Phaser.Scene {
       if (r <= 0) { classId = classes[i]; break; }
     }
 
-    const car = gameState.addCar(classId);
+    const serviceRoll = Math.random();
+    const serviceId = serviceRoll > 0.92
+      ? 'premiumDetail'
+      : serviceRoll > 0.72
+        ? 'deepWash'
+        : 'expressWash';
+    const car = gameState.addCar(classId, serviceId);
     if (!car) return;
 
     audioManager.play('carArrive');
@@ -1418,7 +1428,7 @@ export default class CarWashScene extends Phaser.Scene {
     const sprite = this._carSprites[car.id];
     if (!sprite) return;
 
-    const stages = BALANCE.services.expressWash.stages;
+    const stages = this._getService(car).stages;
     const stage = stages[car.washStage];
 
     let texKey;
@@ -1683,7 +1693,7 @@ export default class CarWashScene extends Phaser.Scene {
   }
 
   _startEmployeeWash(emp, car, bayIndex) {
-    const stages = BALANCE.services.expressWash.stages;
+    const stages = this._getService(car).stages;
     car.washStage = 0;
     car.washProgress = 0;
 
@@ -1710,7 +1720,7 @@ export default class CarWashScene extends Phaser.Scene {
 
     const speedMult = gameState.getUpgradeEffect('washSpeed', 1);
     const carClass = BALANCE.carClasses[car.carClass];
-    const totalTime = BALANCE.services.expressWash.baseDuration * stages.length *
+    const totalTime = this._getService(car).baseDuration * stages.length *
       carClass.timeMultiplier * speedMult / emp.speed;
 
     const stageTime = totalTime / stages.length;
@@ -2067,7 +2077,7 @@ export default class CarWashScene extends Phaser.Scene {
     const sprite = this._carSprites[this._washingCar];
     if (!car || !sprite) return;
 
-    const stages = BALANCE.services.expressWash.stages;
+    const stages = this._getService(car).stages;
     const currentStage = stages[car.washStage] || 'foam';
 
     const pX = this.player.x + 14;
