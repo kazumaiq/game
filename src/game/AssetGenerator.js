@@ -943,13 +943,22 @@ function _generateDecorations(g) {
   // Ствол
   g.fillStyle(0x78350f);
   g.fillRect(TW / 2 - 2, TH - 30, 4, 12);
-  // Пышная стилизованная крона (многоуровневые круги)
+  // Пышная hand-painted крона с несколькими слоями и мягкими бликами.
+  g.fillStyle(0x0b241b, 0.6);
+  g.fillEllipse(TW / 2 + 2, 29, 38, 24);
   g.fillStyle(0x14532d);
-  g.fillCircle(TW / 2, 20, 16);
-  g.fillStyle(0x16a34a);
-  g.fillCircle(TW / 2 - 4, 17, 12);
-  g.fillStyle(0x4ade80, 0.75);
-  g.fillCircle(TW / 2 + 3, 13, 8);
+  g.fillCircle(TW / 2, 20, 17);
+  g.fillCircle(TW / 2 - 10, 23, 10);
+  g.fillCircle(TW / 2 + 10, 22, 11);
+  g.fillStyle(0x166534);
+  g.fillCircle(TW / 2 - 4, 17, 13);
+  g.fillCircle(TW / 2 + 8, 18, 10);
+  g.fillStyle(0x22c55e, 0.92);
+  g.fillCircle(TW / 2 - 5, 15, 9);
+  g.fillCircle(TW / 2 + 7, 13, 7);
+  g.fillStyle(0x86efac, 0.62);
+  g.fillCircle(TW / 2 - 7, 12, 3);
+  g.fillCircle(TW / 2 + 5, 10, 2);
   g.generateTexture('potted_tree', TW, TH);
 
   // Современный уличный фонарный столб с направленным светом
@@ -964,11 +973,15 @@ function _generateDecorations(g) {
   // Консоль со светильником
   g.fillStyle(0x475569);
   g.fillRect(8, 6, 20, 5);
-  // Плафон с теплым LED-светом
-  g.fillStyle(0xfef08a);
-  g.fillCircle(18, 12, 5);
-  g.fillStyle(0xfef08a, 0.35);
-  g.fillCircle(18, 12, 12);
+  // Плафон с тёплым LED-светом и многоуровневым ореолом.
+  g.fillStyle(0xf59e0b, 0.08);
+  g.fillCircle(18, 12, 14);
+  g.fillStyle(0xfef08a, 0.18);
+  g.fillCircle(18, 12, 10);
+  g.fillStyle(0xfef08a, 0.55);
+  g.fillCircle(18, 12, 7);
+  g.fillStyle(0xfff7cc);
+  g.fillCircle(18, 12, 3);
   g.generateTexture('lamp_post', LW, LH);
 }
 
