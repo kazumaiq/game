@@ -6,6 +6,7 @@ import gameState from '../game/systems/GameState.js';
 import BALANCE from '../game/config/balance.js';
 import { showBusinessPanel } from './BusinessPanelUI.js';
 import { showUpgradePanel } from './UpgradePanelUI.js';
+import { showDailyContractsPanel } from './DailyContractsUI.js';
 import { showToast } from './ToastUI.js';
 import { audioManager } from '../game/systems/AudioManager.js';
 
@@ -55,6 +56,9 @@ export function createHUD(scene) {
         <button class="hud-btn" id="hud-btn-upgrades">
           <span>⚡</span> Улучшения
         </button>
+        <button class="hud-btn" id="hud-btn-contracts">
+          <span>🎯</span> Цели
+        </button>
         <button class="hud-btn icon-only" id="hud-btn-pause" title="Пауза">
           ⏸
         </button>
@@ -82,6 +86,10 @@ export function createHUD(scene) {
   document.getElementById('hud-btn-upgrades').addEventListener('click', () => {
     audioManager.play('buttonClick');
     showUpgradePanel();
+  });
+  document.getElementById('hud-btn-contracts').addEventListener('click', () => {
+    audioManager.play('buttonClick');
+    showDailyContractsPanel();
   });
   
   document.getElementById('hud-btn-pause').addEventListener('click', () => {
