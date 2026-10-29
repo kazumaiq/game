@@ -140,7 +140,7 @@ test('10. Сериализация и восстановление (Save / Resto
   gameState.buyDocument('vodokanal');
 
   const snapshot = gameState.serialize();
-  assert.equal(snapshot.saveVersion, 5);
+  assert.equal(snapshot.saveVersion, 6);
   assert.equal(snapshot.location, 'business');
   assert.equal(snapshot.servicePrice, 650);
   assert.equal(snapshot.documents.vodokanal, true);
@@ -465,4 +465,60 @@ test('24. Суточный цикл усиливает освещение пос
   assert.ok(evening.tintAlpha > sunset.tintAlpha);
   assert.ok(evening.lampAlpha > sunset.lampAlpha);
   assert.equal(evening.phase, 'evening');
+});
+
+
+test('16. Каталог химии: покупка списывает деньги и пополняет склад', () => {
+  gameState.initNewGame('roadside');
+  const moneyBefore = gameState.money;
+  const result = gameState.buyChemistry('proFoam');
+  assert.equal(result.success, true);
+  assert.equal(result.stock, 40);
+  assert.equal(gameState.chemistryStock.proFoam, 40);
+  assert.equal(gameState.money, moneyBefore - 42000);
+  assert.equal(gameState.buyChemistry('unknown').success, false);
+  gameState.money = 0;
+  assert.equal(gameState.buyChemistry('wax').success, false);
+});
+
+test('17. Пакеты обслуживания требуют химию и сохраняют выбор', () => {
+  gameState.initNewGame('roadside');
+  assert.equal(gameState.setServicePackage('ceramic').success, false);
+  gameState.buyChemistry('ceramic');
+  assert.equal(gameState.setServicePackage('ceramic').success, true);
+  assert.equal(gameState.activeServicePackage, 'ceramic');
+  const car = gameState.addCar('sedan');
+  gameState.assignCarToPost(car.id, 'post_1');
+  const net = gameState.addServiceIncome(car.id, 1);
+  assert.equal(net, 1700);
+  assert.equal(gameState.chemistryStock.ceramic, 14);
+});
+
+test('18. Развитие бизнеса открывает направления и корректно списывает бюджет', () => {
+  gameState.initNewGame('roadside');
+  const before = gameState.money;
+  assert.equal(gameState.buyBusinessUpgrade('detailing').success, false);
+  gameState.money = 2_000_000;
+  const bought = gameState.buyBusinessUpgrade('detailing');
+  assert.equal(bought.success, true);
+  assert.equal(gameState.businessUpgrades.detailing, 1);
+  assert.ok(gameState.unlockedServices.includes('detailing'));
+  assert.equal(gameState.money, 800_000);
+  assert.equal(gameState.buyBusinessUpgrade('detailing').success, false);
+  assert.ok(before > 0);
+});
+
+test('19. Карта города: участки покупаются один раз и сохраняются', () => {
+  gameState.initNewGame('roadside');
+  gameState.money = 2_000_000;
+  const bought = gameState.buyCityPlot('residential');
+  assert.equal(bought.success, true);
+  assert.equal(gameState.cityPlots.residential, true);
+  assert.equal(gameState.money, 200_000);
+  assert.equal(gameState.buyCityPlot('residential').success, false);
+  const snapshot = gameState.serialize();
+  gameState.reset();
+  assert.equal(gameState.deserialize(snapshot), true);
+  assert.equal(gameState.cityPlots.residential, true);
+  assert.equal(gameState.chemistryStock.basic, 50);
 });
