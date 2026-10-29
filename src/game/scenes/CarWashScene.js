@@ -141,7 +141,7 @@ export default class CarWashScene extends Phaser.Scene {
         .setDisplaySize(300, 192)
         .setDepth(6);
 
-      const label = this.add.text(pos.x, pos.y - 103, `${pos.label} • СВОБОДЕН`, {
+      const label = this.add.text(pos.x, pos.y - 112, `${pos.label} • СВОБОДЕН`, {
         fontSize: '16px',
         color: '#8df4ff',
         backgroundColor: 'rgba(5, 12, 24, 0.98)',
