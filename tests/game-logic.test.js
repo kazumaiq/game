@@ -388,3 +388,49 @@ test('20. Безопасность AudioManager в Node/безголовом о�
 });
 
 
+
+
+test('21. Ежедневные контракты отслеживают прогресс и выдают награду только один раз', () => {
+  gameState.initNewGame('roadside');
+  const contracts = gameState.getDailyContracts();
+  assert.equal(contracts.length, 3);
+
+  const washContract = contracts.find(contract => contract.id === 'wash');
+  assert.ok(washContract);
+  gameState.stats.todayCarsWashed = washContract.target;
+
+  const progressed = gameState.getDailyContracts().find(contract => contract.id === 'wash');
+  assert.equal(progressed.completed, true);
+  assert.equal(progressed.claimable, true);
+
+  const moneyBefore = gameState.money;
+  const reward = gameState.claimDailyContract('wash');
+  assert.equal(reward.success, true);
+  assert.equal(gameState.money, moneyBefore + washContract.reward);
+  assert.equal(gameState.getDailyContracts().find(contract => contract.id === 'wash').claimed, true);
+  assert.equal(gameState.claimDailyContract('wash').success, false);
+
+  gameState.nextDay();
+  const nextDayContracts = gameState.getDailyContracts();
+  assert.equal(gameState.day, 2);
+  assert.ok(nextDayContracts.every(contract => contract.claimed === false));
+  assert.equal(nextDayContracts.find(contract => contract.id === 'wash').progress, 0);
+});
+
+test('22. Прогресс идеальной мойки и состояние полученных контрактов сохраняются', () => {
+  gameState.initNewGame('roadside');
+  const car = gameState.addCar('sedan');
+  assert.ok(car);
+  gameState.addServiceIncome(car.id, 0.9);
+  assert.equal(gameState.stats.todayPerfectWashes, 1);
+  assert.equal(gameState.getDailyContracts().find(contract => contract.id === 'quality').progress, 1);
+
+  const washContract = gameState.getDailyContracts().find(contract => contract.id === 'wash');
+  gameState.stats.todayCarsWashed = washContract.target;
+  assert.equal(gameState.claimDailyContract('wash').success, true);
+
+  const saved = gameState.serialize();
+  assert.equal(gameState.deserialize(saved), true);
+  assert.equal(gameState.getDailyContracts().find(contract => contract.id === 'wash').claimed, true);
+  assert.equal(gameState.stats.todayPerfectWashes, 1);
+});
