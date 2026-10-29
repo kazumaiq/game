@@ -340,6 +340,14 @@ class GameState {
     return { success: true, upgrade: def, level: level + 1 };
   }
 
+  /** Погода влияет на спрос и отображается в игровой сцене. */
+  setWeather(weather) {
+    if (!['clear', 'rain', 'snow'].includes(weather)) return { success: false, reason: 'Неизвестная погода' };
+    this.weather = weather;
+    this.emit('stateChanged');
+    return { success: true, weather };
+  }
+
   /** Покупка участка на карте города. */
   buyCityPlot(plotId) {
     const catalog = {
@@ -705,6 +713,10 @@ class GameState {
     if (this.marketingActive) {
       mult *= BALANCE.marketing.customerFlowBoost;
     }
+
+    // Непогода приводит больше машин на мойку: грязь заметнее, спрос растёт.
+    if (this.weather === 'rain') mult *= 1.2;
+    if (this.weather === 'snow') mult *= 1.35;
 
     if (this.competitorPriceWar) {
       mult *= (1 - BALANCE.competitor.demandReductionDuringWar);
