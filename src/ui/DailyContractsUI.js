@@ -4,6 +4,7 @@
 import gameState from '../game/systems/GameState.js';
 import { showToast } from './ToastUI.js';
 import { audioManager } from '../game/systems/AudioManager.js';
+import saveSystem from '../game/systems/SaveSystem.js';
 
 let cleanupActivePanel = null;
 
@@ -146,6 +147,7 @@ export function showDailyContractsPanel() {
     const result = gameState.claimDailyContract(button.dataset.contractClaim);
     if (result.success) {
       audioManager.play('success');
+      saveSystem.save();
       showToast(`Контракт «${result.title}» выполнен: +${fmtMoney(result.reward)}`, 'success');
     } else {
       showToast(result.reason, 'info');
