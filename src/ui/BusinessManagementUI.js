@@ -64,7 +64,19 @@ function render() {
             const owned = item.max ? level >= item.max : level > 0;
             return card({ icon:item.icon, name:item.name, desc:item.desc, stock:undefined, price:owned ? `Куплено ${level}/${item.max || 1}` : money(item.cost), action:`upgrade:${item.id}`, disabled:owned || gameState.money < item.cost });
           }).join('')
-        : plots.map(item => card({ icon:item.icon, name:item.name, desc:item.desc, price:gameState.cityPlots?.[item.id] ? 'Открыт ✓' : money(item.cost), action:`plot:${item.id}`, disabled:!!gameState.cityPlots?.[item.id] || gameState.money < item.cost, badge:gameState.cityPlots?.[item.id] ? 'ДОСТУПЕН' : '' })).join('');
+        : `<div class="bm-city-map">
+            <div class="bm-map-road bm-map-road-h"></div><div class="bm-map-road bm-map-road-v"></div>
+            <div class="bm-map-district district-home"><span>🏘️</span><b>Жилой район</b><small>${gameState.cityPlots?.residential ? 'Участок открыт' : 'Постоянные клиенты'}</small></div>
+            <div class="bm-map-district district-center"><span>🏙️</span><b>Деловой центр</b><small>${gameState.cityPlots?.business ? 'Участок открыт' : 'Высокий средний чек'}</small></div>
+            <div class="bm-map-district district-industry"><span>🏭</span><b>Промзона</b><small>${gameState.cityPlots?.industrial ? 'Участок открыт' : 'Автопарки и фургоны'}</small></div>
+            <div class="bm-map-district district-current"><span>🚿</span><b>Твоя автомойка</b><small>Основной участок</small></div>
+          </div>
+          <div class="bm-weather-row"><b>Погода на смене</b><div class="bm-weather-buttons">
+            <button data-weather="clear" class="${gameState.weather==='clear'?'active':''}">☀️ Ясно</button>
+            <button data-weather="rain" class="${gameState.weather==='rain'?'active':''}">🌧 Дождь</button>
+            <button data-weather="snow" class="${gameState.weather==='snow'?'active':''}">❄️ Снег</button>
+          </div><small>Дождь повышает спрос на 20%, снег - на 35%.</small></div>
+          ${plots.map(item => card({ icon:item.icon, name:item.name, desc:item.desc, price:gameState.cityPlots?.[item.id] ? 'Открыт ✓' : money(item.cost), action:`plot:${item.id}`, disabled:!!gameState.cityPlots?.[item.id] || gameState.money < item.cost, badge:gameState.cityPlots?.[item.id] ? 'ДОСТУПЕН' : '' })).join('')}`;
 
   root.innerHTML = `<div class="bm-backdrop" data-close="1"><section class="bm-panel" role="dialog" aria-modal="true" aria-label="Развитие бизнеса">
     <header class="bm-header"><div><div class="bm-eyebrow">УПРАВЛЕНИЕ · ДЕНЬ ${gameState.day}</div><h2>Развитие бизнеса</h2><div class="bm-balance">Баланс: <b>${money(gameState.money)}</b></div></div><button class="bm-close" data-close="1" aria-label="Закрыть">✕</button></header>
@@ -81,6 +93,11 @@ function render() {
     if (e.target === el || el.classList.contains('bm-close')) closeBusinessManagement();
   }));
   root.querySelectorAll('[data-tab]').forEach(el => el.addEventListener('click', () => { activeTab = el.dataset.tab; render(); }));
+  root.querySelectorAll('[data-weather]').forEach(el => el.addEventListener('click', () => {
+    const result = gameState.setWeather(el.dataset.weather);
+    if (result.success) showToast('Погода обновлена', 'info');
+    render();
+  }));
   root.querySelectorAll('[data-action]').forEach(el => el.addEventListener('click', () => {
     const [type, id] = el.dataset.action.split(':');
     let result;
