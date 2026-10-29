@@ -5,9 +5,9 @@ import LocationSelectScene from './scenes/LocationSelectScene.js';
 import CarWashScene from './scenes/CarWashScene.js';
 
 export function createGame() {
-  // Используем полный Retina DPR на телефонах (iPhone обычно 3x), ограничивая только экраны выше 3x.
-  // Это повышает чёткость Phaser-текста, тонких линий и процедурных текстур на мобильных устройствах.
-  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  // Cap the internal render resolution at 2x on high-DPI phones. Rendering a 3x
+  // canvas can quadruple pixel work versus 1.5x and cause heat/FPS drops in Safari.
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
   const config = {
     type: Phaser.AUTO,
@@ -18,8 +18,9 @@ export function createGame() {
       height: '100%',
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
-    // Установка devicePixelRatio для четкого рендеринга на Retina / OLED экранах телефонов
+    // Sharp enough on Retina, with a lower GPU fill-rate cost on mobile.
     resolution: dpr,
+    fps: { target: 60, min: 30, forceSetTimeOut: false, deltaHistory: 10 },
     render: {
       antialias: true,
       pixelArt: false,
