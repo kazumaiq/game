@@ -132,27 +132,50 @@ export function generateAssets(scene) {
   g.destroy();
 }
 
-/** 1. Текстурированный графитовый асфальт с микро-зерном и влажным блеском */
+/** 1. Премиальный стилизованный асфальт: зерно, следы шин и влажные блики */
 function _generateAsphalt(g) {
   g.clear();
   const S = 128;
-  // Базовый цвет асфальта
-  g.fillStyle(0x161922);
+  g.fillStyle(0x242630);
   g.fillRect(0, 0, S, S);
 
-  // Микро-зернистость асфальтовой крошки
-  for (let i = 0; i < 90; i++) {
-    const rx = (i * 29 + 7) % S;
-    const ry = (i * 47 + 13) % S;
-    const isLight = i % 3 === 0;
-    g.fillStyle(isLight ? 0x242834 : 0x10131a, 0.65);
-    g.fillRect(rx, ry, (i % 2) + 1, (i % 2) + 1);
+  // Неоднородные холодные и тёплые пятна, как на фактурном дорожном покрытии.
+  for (let i = 0; i < 42; i++) {
+    const x = (i * 37 + 11) % S;
+    const y = (i * 53 + 19) % S;
+    const w = 4 + (i % 7) * 2;
+    const h = 2 + (i % 3) * 2;
+    const palette = [0x30313a, 0x1a1c25, 0x3a3338, 0x202a32];
+    g.fillStyle(palette[i % palette.length], 0.24 + (i % 3) * 0.08);
+    g.fillEllipse(x, y, w, h);
   }
 
-  // Тонкие битумные швы
-  g.fillStyle(0x11141c, 0.4);
+  // Микрозерно - мелкая крошка, не повторяющаяся крупными квадратами.
+  for (let i = 0; i < 260; i++) {
+    const x = (i * 29 + (i % 7) * 13 + 7) % S;
+    const y = (i * 47 + (i % 11) * 5 + 13) % S;
+    const light = i % 5 === 0;
+    g.fillStyle(light ? 0x77717a : (i % 2 ? 0x0f1219 : 0x41414a), light ? 0.24 : 0.34);
+    const size = i % 9 === 0 ? 2 : 1;
+    g.fillRect(x, y, size, size);
+  }
+
+  // Мягкие вытянутые блики от фонарей и мокрых колёс.
+  g.fillStyle(0xb3a2a0, 0.08);
+  g.fillEllipse(24, 35, 36, 4);
+  g.fillEllipse(93, 81, 45, 3);
+  g.fillStyle(0x55c9e8, 0.08);
+  g.fillEllipse(64, 108, 32, 3);
+  g.fillStyle(0x0d1119, 0.3);
   g.fillRect(0, 64, S, 1);
   g.fillRect(64, 0, 1, S);
+
+  // Тонкие следы шин.
+  g.lineStyle(1, 0x10131b, 0.2);
+  g.strokeLineShape(new Phaser.Geom.Line(8, 16, 29, 52));
+  g.strokeLineShape(new Phaser.Geom.Line(101, 20, 117, 48));
+  g.lineStyle(1, 0x8c7c80, 0.12);
+  g.strokeLineShape(new Phaser.Geom.Line(38, 88, 58, 116));
 
   g.generateTexture('asphalt_ground', S, S);
 }
@@ -185,19 +208,37 @@ function _generateRoad(g) {
   g.generateTexture('road_strip', W, H);
 }
 
-/** 3. Натуральный подстриженный газон */
+/** 3. Стилизованный газон с направлением травы, цветом и мелкими акцентами */
 function _generateLawn(g) {
   g.clear();
   const S = 64;
-  g.fillStyle(0x143823);
+  g.fillStyle(0x254936);
   g.fillRect(0, 0, S, S);
 
-  // Текстура травы
-  for (let i = 0; i < 40; i++) {
-    const x = (i * 17) % (S - 4);
-    const y = (i * 23) % (S - 4);
-    g.fillStyle(i % 2 === 0 ? 0x1b4d31 : 0x0f2d1c, 0.7);
-    g.fillRect(x, y, 3, 3);
+  // Мягкие цветовые островки дают газону глубину, не создавая шумной сетки.
+  for (let i = 0; i < 24; i++) {
+    const x = (i * 19 + 5) % S;
+    const y = (i * 31 + 9) % S;
+    const colors = [0x386447, 0x1a382a, 0x496747, 0x203f31];
+    g.fillStyle(colors[i % colors.length], 0.34);
+    g.fillEllipse(x, y, 8 + (i % 3) * 3, 4 + (i % 2) * 2);
+  }
+
+  // Короткие штрихи травы с разными оттенками, как в hand-painted окружении.
+  for (let i = 0; i < 96; i++) {
+    const x = (i * 17 + (i % 5) * 7) % S;
+    const y = (i * 23 + (i % 7) * 3) % S;
+    const color = i % 4 === 0 ? 0x9bb879 : (i % 3 === 0 ? 0x6c9b65 : 0x102d22);
+    g.lineStyle(1, color, i % 4 === 0 ? 0.32 : 0.42);
+    g.strokeLineShape(new Phaser.Geom.Line(x, y, x + (i % 3) - 1, y - 2 - (i % 3)));
+  }
+
+  // Единичные цветы и камешки для органичности.
+  for (let i = 0; i < 5; i++) {
+    const x = (i * 29 + 12) % S;
+    const y = (i * 17 + 8) % S;
+    g.fillStyle(i % 2 ? 0xf5d9a0 : 0xd9e6b2, 0.62);
+    g.fillCircle(x, y, 1);
   }
 
   g.generateTexture('lawn_tile', S, S);
