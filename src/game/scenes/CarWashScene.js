@@ -133,6 +133,30 @@ export default class CarWashScene extends Phaser.Scene {
     const yard = this.add.tileSprite(yardX, yardY, yardW, yardH, 'asphalt_ground');
     yard.setDepth(2);
 
+    // Неповторяющийся верхний слой фактуры на всей площадке:
+    // длинные влажные потёки и разрозненные блики убирают ощущение дешёвой повторяющейся плитки.
+    const surfaceDetail = this.add.graphics().setDepth(2.12);
+    for (let i = 0; i < 74; i++) {
+      const x = 68 + ((i * 137 + (i % 7) * 29) % (yardW - 136));
+      const y = 76 + ((i * 83 + (i % 9) * 17) % (yardH - 152));
+      const rx = 3 + (i % 5) * 2;
+      const ry = 1 + (i % 3);
+      const color = i % 6 === 0 ? 0xfb923c : (i % 3 === 0 ? 0x67e8f9 : 0x94a3b8);
+      surfaceDetail.fillStyle(color, i % 6 === 0 ? 0.075 : 0.045 + (i % 3) * 0.012);
+      surfaceDetail.fillEllipse(yardX - yardW / 2 + x, yardY - yardH / 2 + y, rx * 2, ry * 2);
+    }
+    for (let i = 0; i < 22; i++) {
+      const x = yardX - yardW / 2 + 36 + ((i * 173) % (yardW - 72));
+      const y = yardY - yardH / 2 + 28 + ((i * 97) % (yardH - 56));
+      const length = 8 + (i % 6) * 7;
+      surfaceDetail.fillStyle(i % 5 === 0 ? 0xfb923c : 0xdbeafe, i % 5 === 0 ? 0.09 : 0.065);
+      surfaceDetail.fillRoundedRect(x, y, length, i % 3 === 0 ? 2 : 1, 1);
+      if (i % 4 === 0) {
+        surfaceDetail.fillStyle(0x67e8f9, 0.045);
+        surfaceDetail.fillRoundedRect(x + 3, y + 3, length * 0.55, 1, 1);
+      }
+    }
+
     // 4. Дорожное полотно с разделительной полосой
     const road = this.add.tileSprite(WORLD.width / 2, WORLD.roadY, WORLD.width, 80, 'road_strip');
     road.setDepth(3);
