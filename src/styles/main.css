@@ -2834,3 +2834,59 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   }
   .dialog-box { padding: 17px; border-radius: 17px; }
 }
+
+
+/* ================= IMMERSIVE SHIFT CLOCK / DAYPART COLOR ================= */
+.hud-pill.time {
+  gap: 5px;
+  min-width: 103px;
+  justify-content: center;
+  border-color: rgba(251, 191, 36, .44);
+  background: linear-gradient(145deg, rgba(66, 44, 26, .94), rgba(15, 23, 42, .95));
+  transition: background .35s ease, border-color .35s ease, box-shadow .35s ease;
+}
+.hud-pill.time .icon { font-size: 13px; }
+.hud-pill.time .val {
+  color: #fff5dc;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .025em;
+}
+.hud-pill.time .lbl {
+  color: #fbd38d;
+  font-size: 9px;
+}
+.hud-pill.time.phase-morning {
+  border-color: rgba(251, 191, 36, .58);
+  background: linear-gradient(145deg, rgba(120, 74, 32, .94), rgba(30, 35, 49, .95));
+  box-shadow: 0 2px 10px rgba(251, 146, 60, .13);
+}
+.hud-pill.time.phase-day {
+  border-color: rgba(56, 189, 248, .48);
+  background: linear-gradient(145deg, rgba(13, 72, 102, .94), rgba(15, 23, 42, .95));
+}
+.hud-pill.time.phase-day .lbl { color: #bae6fd; }
+.hud-pill.time.phase-golden {
+  border-color: rgba(251, 146, 60, .72);
+  background: linear-gradient(145deg, rgba(124, 59, 26, .96), rgba(32, 29, 47, .96));
+  box-shadow: 0 2px 14px rgba(249, 115, 22, .2);
+}
+.hud-pill.time.phase-golden .lbl { color: #fed7aa; }
+.hud-pill.time.phase-evening {
+  border-color: rgba(167, 139, 250, .62);
+  background: linear-gradient(145deg, rgba(51, 43, 91, .96), rgba(10, 18, 39, .98));
+  box-shadow: 0 2px 15px rgba(99, 102, 241, .18);
+}
+.hud-pill.time.phase-evening .lbl { color: #ddd6fe; }
+
+@media (max-width: 580px) {
+  .hud-pill.time {
+    min-width: 75px;
+    gap: 4px;
+    padding-left: 5px;
+    padding-right: 5px;
+  }
+  .hud-pill.time .lbl { display: none; }
+  .hud-pill.time .icon,
+  .hud-pill.time .val { font-size: 11px; }
+}
