@@ -194,10 +194,16 @@ class GameState {
     return { success: true, newStock: this.suppliesStock };
   }
 
+  /** Проверка, может ли автомойка начать расходный этап обслуживания. */
+  canStartService() {
+    if (this.suppliesStock <= 0) return { allowed: false, reason: 'Закончилась автохимия' };
+    return { allowed: true };
+  }
+
   /** Доход за оказанную услугу */
   addServiceIncome(carId, quality) {
     const car = this.cars.find(c => c.id === carId);
-    if (!car || car.paid) return 0;
+    if (!car || car.paid || this.suppliesStock <= 0) return 0;
 
     const carClass = BALANCE.carClasses[car.carClass];
     const price = Math.round(this.servicePrice * carClass.priceMultiplier);
@@ -620,7 +626,7 @@ class GameState {
   enableLoyalty() {
     if (this.loyaltyActive) return { success: false, reason: 'Уже активна' };
     if (this.money < BALANCE.loyalty.setupCost) {
-      return { success: false, reason: 'Недостаточно средств' };
+      return { success: false, reason: 'Недостат��чно средств' };
     }
     this.money -= BALANCE.loyalty.setupCost;
     this.stats.totalExpenses += BALANCE.loyalty.setupCost;

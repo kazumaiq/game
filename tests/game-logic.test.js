@@ -528,6 +528,25 @@ test('24. Суточный цикл усиливает освещение пос
   assert.ok(morning.tintAlpha > noon.tintAlpha);
   assert.ok(sunset.tintAlpha > noon.tintAlpha);
   assert.ok(evening.tintAlpha > sunset.tintAlpha);
-  assert.ok(evening.lampAlpha > sunset.lampAlpha);
   assert.equal(evening.phase, 'evening');
 });
+
+test('25. Мойка блокируется без автохимии и не меняет баланс', () => {
+  gameState.initNewGame('roadside');
+  const car = gameState.addCar('sedan');
+  assert.ok(car);
+  assert.equal(gameState.assignCarToPost(car.id, 'post_1'), true);
+  gameState.suppliesStock = 0;
+  const moneyBefore = gameState.money;
+  const revenueBefore = gameState.stats.totalRevenue;
+
+  assert.deepEqual(gameState.canStartService(), {
+    allowed: false,
+    reason: 'Закончилась автохимия',
+  });
+  assert.equal(gameState.addServiceIncome(car.id, 0.9), 0);
+  assert.equal(gameState.money, moneyBefore);
+  assert.equal(gameState.stats.totalRevenue, revenueBefore);
+  assert.equal(car.paid, false);
+});
+

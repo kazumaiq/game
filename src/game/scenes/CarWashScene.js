@@ -1138,6 +1138,11 @@ export default class CarWashScene extends Phaser.Scene {
   _startWashing(carId) {
     const car = gameState.getCar(carId);
     if (!car || this._isWashing || car.completed) return;
+    const serviceCheck = gameState.canStartService();
+    if (!serviceCheck.allowed) {
+      showToast(`${serviceCheck.reason}. Пополни запас перед мойкой.`, 'warning');
+      return;
+    }
 
     this._isWashing = true;
     this._washingCar = carId;
