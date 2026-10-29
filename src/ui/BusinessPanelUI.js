@@ -90,6 +90,23 @@ export function showBusinessPanel() {
         </div>
       </div>
 
+      <div class="panel-section expansion-section">
+        <h3>Расширение автомойки</h3>
+        <p style="color:#94a3b8;font-size:12px;margin:0 0 10px;">Открывай новые боксы, чтобы обслуживать больше машин параллельно и быстрее выполнять контракты.</p>
+        ${[
+          {id:"post_3",title:"Бокс 3 · Экспресс-линия",desc:"Дополнительное место для клиентов и больше пропускной способности.",price:450000},
+          {id:"post_4",title:"Бокс 4 · Премиум-линия",desc:"Ещё один рабочий пост для роста выручки. Требует открытый бокс 3.",price:900000}
+        ].map(b => {
+          const post = gameState.posts.find(p => p.id === b.id);
+          const unlocked = post && post.unlocked !== false;
+          const canAfford = gameState.money >= b.price && (b.id !== "post_4" || gameState.posts.find(p => p.id === "post_3")?.unlocked !== false);
+          return '<article class="expansion-card ' + (unlocked ? "is-unlocked" : "") + '">' +
+            '<div class="expansion-copy"><strong>' + b.title + '</strong><span>' + b.desc + '</span><small>' + (unlocked ? "✓ Бокс работает" : "Разовая инвестиция · без ежедневной аренды") + '</small></div>' +
+            (unlocked ? '<span class="expansion-status">ОТКРЫТ</span>' : '<button class="game-btn primary" data-unlock-post="' + b.id + '" ' + (canAfford ? "" : "disabled") + '>Открыть · ' + fmt(b.price) + '</button>') +
+            '</article>';
+        }).join("")}
+      </div>
+
       <div class="panel-section">
         <h3>Документы и проверки надзора</h3>
         <p style="color:#94a3b8;font-size:11px;margin-bottom:8px;">
@@ -158,6 +175,22 @@ export function showBusinessPanel() {
       } else {
         audioManager.play('error');
         showToast(res.reason, 'warning');
+      }
+    });
+  });
+
+  // Unlock additional wash bays.
+  panel.querySelectorAll('[data-unlock-post]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const result = gameState.unlockPost(btn.dataset.unlockPost);
+      if (result.success) {
+        audioManager.play('cashRegister');
+        showToast('Новый бокс открыт! Теперь можно обслуживать больше клиентов.', 'success');
+        panel.remove();
+        showBusinessPanel();
+      } else {
+        audioManager.play('error');
+        showToast(result.reason, 'warning');
       }
     });
   });
