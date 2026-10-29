@@ -1391,3 +1391,162 @@ html, body {
     max-height: calc(100svh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 16px);
   }
 }
+
+
+/* ================= ЕЖЕДНЕВНЫЕ КОНТРАКТЫ ================= */
+.daily-contracts-panel {
+  max-width: 580px;
+}
+.daily-contracts-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+.daily-contracts-header h2 {
+  margin: 3px 0 0;
+  padding-right: 0 !important;
+}
+.daily-contracts-kicker {
+  color: #38bdf8;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 1.5;
+}
+.daily-contracts-intro {
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0 0 14px;
+}
+.daily-contract-list {
+  display: grid;
+  gap: 10px;
+}
+.daily-contract-card {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.68);
+  border-radius: 12px;
+  padding: 12px;
+  transition: border-color 0.18s, background 0.18s;
+}
+.daily-contract-card.is-complete {
+  border-color: rgba(34, 197, 94, 0.55);
+  background: rgba(20, 83, 45, 0.16);
+}
+.daily-contract-card.is-claimed {
+  opacity: 0.8;
+}
+.daily-contract-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.daily-contract-icon {
+  display: flex;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: #67e8f9;
+  background: rgba(8, 145, 178, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.24);
+  font-size: 18px;
+  font-weight: 800;
+}
+.daily-contract-title-wrap {
+  flex: 1;
+  min-width: 0;
+}
+.daily-contract-title-wrap h3 {
+  margin: 1px 0 4px;
+  font-size: 13px;
+  color: #f8fafc;
+}
+.daily-contract-title-wrap p {
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.45;
+}
+.daily-contract-status {
+  flex: 0 0 auto;
+  color: #94a3b8;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 4px 5px;
+  border-radius: 5px;
+  background: rgba(148, 163, 184, 0.1);
+}
+.daily-contract-status.is-done {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.12);
+}
+.daily-contract-status.is-claimed {
+  color: #67e8f9;
+  background: rgba(8, 145, 178, 0.14);
+}
+.daily-contract-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 7px;
+  font-size: 10px;
+  color: #cbd5e1;
+}
+.daily-contract-meta strong {
+  color: #86efac;
+  white-space: nowrap;
+}
+.daily-contract-track {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.16);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.daily-contract-track span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #06b6d4, #22c55e);
+  transition: width 0.22s ease;
+}
+.daily-contract-card .game-btn {
+  width: 100%;
+  min-height: 36px;
+}
+.daily-contracts-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+  font-size: 11px;
+}
+.daily-contracts-summary strong {
+  color: #e2e8f0;
+  text-align: right;
+}
+@media (max-width: 420px) {
+  .daily-contracts-panel {
+    padding: 12px;
+  }
+  .daily-contracts-status {
+    font-size: 7px;
+  }
+  .daily-contracts-card {
+    padding: 9px;
+  }
+  .daily-contract-title-wrap h3 {
+    font-size: 12px;
+  }
+}
