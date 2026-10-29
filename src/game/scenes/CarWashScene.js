@@ -1930,6 +1930,7 @@ export default class CarWashScene extends Phaser.Scene {
     }
     gameState.cars = [];
     gameState.queue = [];
+    if (this._queueMoodGfx) this._queueMoodGfx.clear();
 
     for (const post of gameState.posts) {
       post.busy = false;
@@ -1955,6 +1956,8 @@ export default class CarWashScene extends Phaser.Scene {
     const income = todayLogs.filter(l => l.type === 'income').reduce((s, l) => s + l.amount, 0);
     const expenses = todayLogs.filter(l => l.type === 'expense').reduce((s, l) => s + l.amount, 0);
     const profit = income - expenses;
+
+    const unlockedToday = todayLogs.filter(log => log.type === 'income' && log.description.startsWith('Достижение:'));
 
     let rows = '';
     for (const log of todayLogs) {
@@ -1994,7 +1997,12 @@ export default class CarWashScene extends Phaser.Scene {
             <td style="color:${profit >= 0 ? '#22c55e' : '#ef4444'}">${profit >= 0 ? '+' : ''}${this._formatMoney(profit)}</td>
           </tr>
         </table>
-        <p style="margin-top:10px;color:#cbd5e1;font-size:12px;">Помыто: <strong>${gameState.stats.todayCarsWashed}</strong> авто</p>
+        <div class="shift-report-metrics">
+          <div><span>АВТО ЗА СМЕНУ</span><strong>${gameState.stats.todayCarsWashed}</strong></div>
+          <div><span>ИДЕАЛЬНЫЕ МОЙКИ</span><strong>${gameState.stats.todayPerfectWashes}</strong></div>
+          <div><span>РЕПУТАЦИЯ</span><strong>${Math.round(gameState.reputation)} / 100</strong></div>
+        </div>
+        ${unlockedToday.length ? `<div class="shift-report-achievements"><strong>🏆 Новые достижения</strong><span>${unlockedToday.map(log => log.description.replace('Достижение: ', '')).join(' · ')}</span></div>` : ''}
         <p style="color:#cbd5e1;font-size:12px;">Баланс кассы: <strong style="color:#38bdf8">${this._formatMoney(gameState.money)}</strong></p>
         ${gameState.money < 0 ? '<p style="color:#ef4444;font-weight:bold;margin-top:6px;font-size:12px;">⚠ Баланс ушел в минус! Оптимизируйте расходы.</p>' : ''}
         <div style="text-align:center;margin-top:14px;">
