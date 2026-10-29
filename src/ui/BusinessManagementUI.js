@@ -105,6 +105,7 @@ function render() {
     if (type === 'package') result = gameState.setServicePackage(id);
     if (type === 'upgrade') result = gameState.buyBusinessUpgrade(id);
     if (type === 'plot') result = gameState.buyCityPlot(id);
+    if (type === 'order') result = gameState.completeBusinessOrder(id);
     if (!result?.success) showToast(result?.reason || 'Не удалось выполнить действие', 'error');
     else showToast(type === 'package' ? `Выбран пакет: ${result.package.name}` : 'Покупка успешно оформлена', 'success');
     render();
