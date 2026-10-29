@@ -260,7 +260,41 @@ export default class CarWashScene extends Phaser.Scene {
     light.fillRoundedRect(95, WORLD.roadY + 5, 52, 2, 1);
     light.fillRoundedRect(720, WORLD.roadY - 4, 37, 2, 1);
 
-    // Тонкие отражения и царапины на поверхности придают покрытию масштаб.
+    // Мокрые отражения: несколько разной длины полос вместо равномерного шума.
+    // Группируем их в перспективные следы, чтобы покрытие читалось как мокрый бетон.
+    const reflections = [
+      [214, 391, 54, 2, 0x9be7ff, 0.17],
+      [284, 410, 23, 1, 0xffffff, 0.13],
+      [326, 431, 69, 2, 0x38bdf8, 0.12],
+      [470, 397, 36, 1, 0xffffff, 0.12],
+      [512, 448, 74, 2, 0xe2e8f0, 0.14],
+      [574, 430, 29, 1, 0x67e8f9, 0.17],
+      [346, 489, 42, 2, 0xfb923c, 0.12],
+      [403, 515, 81, 2, 0x38bdf8, 0.09],
+      [612, 500, 44, 1, 0xffffff, 0.11],
+      [256, 535, 28, 1, 0x67e8f9, 0.13],
+      [690, 420, 32, 1, 0xfb923c, 0.1],
+      [162, 453, 36, 1, 0xffffff, 0.1],
+    ];
+    for (const [x, y, w, h, color, alpha] of reflections) {
+      light.fillStyle(color, alpha);
+      light.fillRoundedRect(x, y, w, h, 1);
+      if (w > 40) {
+        light.fillStyle(color, alpha * 0.35);
+        light.fillRoundedRect(x + w * 0.2, y + 3, w * 0.45, 1, 1);
+      }
+    }
+
+    // Низкие направляющие световые маркеры вдоль прохода.
+    for (let i = 0; i < 6; i++) {
+      const y = 326 + i * 31;
+      const alpha = 0.16 - i * 0.012;
+      light.fillStyle(0x22d3ee, alpha);
+      light.fillRoundedRect(118, y, 7, 2, 1);
+      light.fillRoundedRect(775, y, 7, 2, 1);
+    }
+
+    // Сохранённые царапины и тонкие кромочные блики.
     light.lineStyle(1, 0xe2e8f0, 0.09);
     light.strokeLineShape(new Phaser.Geom.Line(230, 420, 273, 418));
     light.strokeLineShape(new Phaser.Geom.Line(520, 448, 582, 445));
@@ -295,6 +329,28 @@ export default class CarWashScene extends Phaser.Scene {
     // Ограждающие конусы
     this.add.image(WORLD.entrance.x + 35, WORLD.entrance.y - 60, 'cone').setDepth(7);
     this.add.image(WORLD.entrance.x + 65, WORLD.entrance.y - 60, 'cone').setDepth(7);
+
+    // Контрастные въездные маркеры и световые studs по периметру площадки.
+    const perimeter = this.add.graphics().setDepth(3.2);
+    perimeter.lineStyle(2, 0x0b1320, 0.7);
+    perimeter.strokeLineShape(new Phaser.Geom.Line(66, 112, 834, 112));
+    perimeter.strokeLineShape(new Phaser.Geom.Line(66, 428, 834, 428));
+    for (let i = 0; i < 16; i++) {
+      const x = 86 + i * 48;
+      perimeter.fillStyle(i % 4 === 0 ? 0xfb923c : 0x38bdf8, i % 4 === 0 ? 0.78 : 0.36);
+      perimeter.fillRoundedRect(x, 117, i % 4 === 0 ? 15 : 8, 2, 1);
+      perimeter.fillStyle(0x67e8f9, 0.22);
+      perimeter.fillRoundedRect(x + 12, 423, 10, 2, 1);
+    }
+
+    // Вытянутые следы воды у дренажа и перед рабочими постами.
+    const water = this.add.graphics().setDepth(3.15);
+    for (let i = 0; i < 10; i++) {
+      const x = 180 + i * 59;
+      const y = 352 + (i % 3) * 31;
+      water.fillStyle(i % 2 ? 0x67e8f9 : 0x94a3b8, 0.075 + (i % 3) * 0.018);
+      water.fillEllipse(x, y, 18 + (i % 4) * 7, 2 + (i % 2));
+    }
   }
 
   _updatePostStatuses() {
