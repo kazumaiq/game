@@ -157,13 +157,16 @@ export default class CarWashScene extends Phaser.Scene {
       
       const sprite = this.add.image(pos.x, pos.y, tex).setDepth(6);
       
-      const lbl = this.add.text(pos.x, pos.y - 74, `${pos.label} • СВОБОДЕН`, {
-        fontSize: '11px',
-        color: '#38bdf8',
-        backgroundColor: 'rgba(15, 23, 42, 0.95)',
-        padding: { x: 8, y: 3 },
-        fontFamily: 'system-ui, sans-serif',
+      const lbl = this.add.text(pos.x, pos.y - 78, `${pos.label} • СВОБОДЕН`, {
+        fontSize: '13px',
+        color: '#67e8f9',
+        backgroundColor: 'rgba(5, 12, 24, 0.98)',
+        padding: { x: 10, y: 5 },
+        fontFamily: 'Arial, Helvetica, sans-serif',
         fontStyle: 'bold',
+        stroke: '#07111f',
+        strokeThickness: 2,
+        shadow: { offsetX: 0, offsetY: 1, color: '#000000', blur: 2, fill: true },
       }).setOrigin(0.5).setDepth(8);
 
       this._postSprites.push(sprite);
