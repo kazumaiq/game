@@ -3250,3 +3250,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .shift-report-achievements strong { color:#86efac; font-size:12px; }
 .shift-report-achievements span { color:#c5eadd; font-size:11px; line-height:1.4; }
 @media (max-width:420px) { .shift-report-metrics { gap:5px; } .shift-report-metrics > div { padding:8px 6px; } .shift-report-metrics span { font-size:7px; } .shift-report-metrics strong { font-size:13px; } }
+
+.career-streak-banner { display:flex; align-items:center; gap:10px; margin:14px 0 16px; padding:12px; border:1px solid rgba(251,191,36,.24); border-radius:14px; background:linear-gradient(115deg,rgba(120,53,15,.15),rgba(15,23,42,.78)); }
+.career-streak-banner > span { display:grid; place-items:center; flex:0 0 34px; height:34px; border-radius:11px; color:#fcd34d; background:rgba(251,191,36,.1); font-size:19px; }
+.career-streak-banner > div { flex:1; min-width:0; }
+.career-streak-banner > div strong { color:#f8e6b2; font-size:12px; }
+.career-streak-banner p { margin:4px 0 0; color:#9fb0c4; font-size:10px; line-height:1.4; }
+.career-streak-banner > strong { color:#fcd34d; font-size:11px; white-space:nowrap; }
+.career-streak-banner.is-hot { border-color:rgba(251,191,36,.48); background:linear-gradient(115deg,rgba(120,53,15,.28),rgba(15,23,42,.85)); box-shadow:0 0 20px rgba(251,191,36,.06); }
+@media (max-width:420px) { .career-streak-banner { gap:7px; padding:10px; } .career-streak-banner > span { flex-basis:28px; height:28px; font-size:16px; } .career-streak-banner > div strong { font-size:11px; } .career-streak-banner p { font-size:9px; } .career-streak-banner > strong { font-size:9px; } }
