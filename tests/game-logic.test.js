@@ -492,6 +492,33 @@ test('26. Открытие третьего бокса меняет состоя
   assert.equal(gameState.achievements.third_bay, true);
 });
 
+test('27. Серия идеальных моек начисляет бонус и сохраняет рекорд', () => {
+  gameState.initNewGame('roadside');
+  const moneyBefore = gameState.money;
+  for (let i = 0; i < 3; i++) {
+    const car = gameState.addCar('sedan');
+    assert.ok(car);
+    assert.equal(gameState.assignCarToPost(car.id, 'post_1'), true);
+    gameState.addServiceIncome(car.id, 0.9);
+    gameState.removeCar(car.id);
+  }
+  assert.equal(gameState.perfectWashStreak, 3);
+  assert.equal(gameState.bestPerfectWashStreak, 3);
+  assert.equal(gameState.achievements.perfect_streak_3, true);
+  assert.equal(gameState.money, moneyBefore + 11700);
+  const snapshot = gameState.serialize();
+  gameState.reset();
+  assert.equal(gameState.deserialize(snapshot), true);
+  assert.equal(gameState.perfectWashStreak, 3);
+  assert.equal(gameState.bestPerfectWashStreak, 3);
+  const bad = gameState.addCar('sedan');
+  assert.ok(bad);
+  gameState.assignCarToPost(bad.id, 'post_1');
+  gameState.addServiceIncome(bad.id, 0.6);
+  assert.equal(gameState.perfectWashStreak, 0);
+  assert.equal(gameState.bestPerfectWashStreak, 3);
+});
+
 test('24. Суточный цикл усиливает освещение постов к вечеру', () => {
   const morning = getDayCycleProfile(8);
   const noon = getDayCycleProfile(12);
