@@ -2004,6 +2004,7 @@ html, body {
 .menu-screen-premium .menu-bottom-row {
   justify-content: space-between;
   gap: 7px;
+  flex-wrap: wrap;
   padding: 4px 2px 0;
 }
 .menu-screen-premium .menu-link-btn {
@@ -2018,6 +2019,10 @@ html, body {
 .menu-screen-premium .menu-link-btn:active {
   color: #f8fafc;
   background: rgba(148, 163, 184, 0.1);
+}
+.menu-screen-premium .menu-link-btn:focus-visible {
+  outline: 2px solid #67e8f9;
+  outline-offset: 2px;
 }
 .menu-link-icon {
   color: #67e8f9;

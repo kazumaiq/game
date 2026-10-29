@@ -5,6 +5,7 @@
 import FullscreenManager from '../game/systems/FullscreenManager.js';
 import saveSystem from '../game/systems/SaveSystem.js';
 import { audioManager } from '../game/systems/AudioManager.js';
+import { showUpgradePanel } from './UpgradePanelUI.js';
 
 let _menuElement = null;
 let _settingsModal = null;
@@ -87,6 +88,7 @@ export function showMenu({ hasSave, onNewGame, onContinue }) {
           '</button>',
         '</div>',
         '<div class="menu-bottom-row">',
+          '<button class="menu-link-btn" id="menu-upgrades" type="button"><span class="menu-link-icon" aria-hidden="true">↗</span> Улучшения</button>',
           '<button class="menu-link-btn" id="menu-settings" type="button"><span class="menu-link-icon" aria-hidden="true">⚙</span> Настройки</button>',
           '<button class="menu-link-btn" id="menu-fullscreen" type="button"><span class="menu-link-icon" aria-hidden="true">' + (isFs ? '⊡' : '⛶') + '</span> ' + (isFs ? 'Свернуть' : 'Полный экран') + '</button>',
         '</div>',
@@ -121,6 +123,12 @@ export function showMenu({ hasSave, onNewGame, onContinue }) {
       window.setTimeout(() => { isTransitioning = false; }, 1200);
     });
   }
+
+  div.querySelector('#menu-upgrades').addEventListener('click', () => {
+    audioManager.ensureContext();
+    audioManager.play('buttonClick');
+    showUpgradePanel();
+  });
 
   div.querySelector('#menu-settings').addEventListener('click', () => {
     audioManager.ensureContext();
@@ -210,6 +218,14 @@ function _showSettings() {
 
   overlay.appendChild(backdrop);
   _settingsModal = backdrop;
+
+  backdrop.querySelector('#settings-close').focus();
+  backdrop.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      _hideSettings();
+    }
+  });
 
   backdrop.querySelector('#settings-close').addEventListener('click', () => {
     audioManager.play('buttonClick');
