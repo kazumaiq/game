@@ -52,6 +52,22 @@ class SaveSystem {
     }
   }
 
+  getSaveSummary() {
+    try {
+      const json = localStorage.getItem(SAVE_KEY);
+      if (!json) return null;
+      const data = JSON.parse(json);
+      if (!data || !data.saveVersion || !data.initialized) return null;
+      return {
+        day: Number.isFinite(data.day) ? Math.max(1, Math.floor(data.day)) : 1,
+        money: Number.isFinite(data.money) ? data.money : 0,
+        reputation: Number.isFinite(data.reputation) ? Math.max(0, Math.min(100, data.reputation)) : 50,
+      };
+    } catch {
+      return null;
+    }
+  }
+
   deleteSave() {
     localStorage.removeItem(SAVE_KEY);
   }

@@ -32,6 +32,10 @@ export function showMenu({ hasSave, onNewGame, onContinue }) {
   hideMenu();
 
   const overlay = document.getElementById('ui-overlay');
+  const saveSummary = hasSave ? saveSystem.getSaveSummary() : null;
+  const saveLabel = saveSummary
+    ? `ДЕНЬ ${saveSummary.day} · ${Math.round(saveSummary.reputation)}% РЕПУТАЦИИ`
+    : (hasSave ? 'СОХРАНЕНИЕ НАЙДЕНО' : 'СТАРТОВЫЙ КАПИТАЛ · 6 000 000 ₽');
   if (!overlay) return;
 
   const div = document.createElement('div');
@@ -73,7 +77,7 @@ export function showMenu({ hasSave, onNewGame, onContinue }) {
         '</div>',
         '<div class="menu-save-indicator ' + (hasSave ? 'is-saved' : 'is-empty') + '" id="menu-save-indicator">',
           '<span class="menu-save-dot"></span>',
-          '<span id="menu-save-label">' + (hasSave ? 'СОХРАНЕНИЕ НАЙДЕНО' : 'СТАРТОВЫЙ КАПИТАЛ · 6 000 000 ₽') + '</span>',
+          '<span id="menu-save-label">' + saveLabel + '</span>',
         '</div>',
         '<div class="menu-actions">',
           '<button class="menu-btn menu-btn-primary menu-btn-premium" id="menu-new-game" type="button">',
