@@ -99,15 +99,25 @@ export default class CarWashScene extends Phaser.Scene {
     const height = gameSize.height;
 
     const minDim = Math.min(width, height);
+    const portraitPhone = width < 460 && height > width;
     let targetZoom = 1.15;
-    if (minDim < 420) {
-      targetZoom = 0.95;
+    if (portraitPhone) {
+      // На узком телефоне показываем оба бокса целиком, а не обрезаем подписи по краям.
+      targetZoom = 0.68;
+    } else if (minDim < 420) {
+      targetZoom = 0.9;
     } else if (minDim < 650) {
       targetZoom = 1.05;
     }
 
     this.cameras.main.setZoom(targetZoom);
     this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
+
+    // Компенсируем уменьшение камеры, чтобы персонаж оставался заметным на портретном экране.
+    if (this.player) {
+      const playerScale = portraitPhone ? 1.35 : 1;
+      this.player.setScale(playerScale);
+    }
   }
 
   _createEnvironment() {
@@ -182,7 +192,7 @@ export default class CarWashScene extends Phaser.Scene {
       const sprite = this.add.image(pos.x, pos.y, tex).setDepth(6);
       
       const lbl = this.add.text(pos.x, pos.y - 78, `${pos.label} • СВОБОДЕН`, {
-        fontSize: '13px',
+        fontSize: '16px',
         color: '#67e8f9',
         backgroundColor: 'rgba(5, 12, 24, 0.98)',
         padding: { x: 10, y: 5 },
