@@ -61,8 +61,11 @@ class GameState {
       todayCarsWashed: 0,
       todayRevenue: 0,
       todayExpenses: 0,
+      todayPerfectWashes: 0,
     };
 
+    this.dailyContractDay = 0;
+    this.dailyContracts = [];
     this.financialLog = [];
     this.storyFlags = {};
     this.tutorialCompleted = false;
@@ -84,7 +87,7 @@ class GameState {
       sfxVolume: 0.7,
     };
 
-    this.saveVersion = 4;
+    this.saveVersion = 5;
     this.shiftEndProcessing = false;
   }
 
@@ -133,6 +136,7 @@ class GameState {
     this.day = 1;
     this.shiftActive = true;
     this.shiftTimeRemaining = BALANCE.time.shiftDurationMs;
+    this._refreshDailyContracts();
     this.emit('stateChanged');
   }
 
@@ -203,6 +207,7 @@ class GameState {
     this._logFinance('expense', `Материалы (${carClass.name})`, supplyCost);
 
     if (quality >= 0.85) {
+      this.stats.todayPerfectWashes++;
       this.changeReputation(BALANCE.reputation.goodServiceBonus);
     } else if (quality < 0.5) {
       this.changeReputation(BALANCE.reputation.poorServicePenalty);
@@ -393,12 +398,95 @@ class GameState {
     return true;
   }
 
+  _refreshDailyContracts(savedContracts = null) {
+    const day = Math.max(1, Math.floor(Number(this.day) || 1));
+    const previousClaims = new Map(
+      (Array.isArray(savedContracts) ? savedContracts : [])
+        .filter(contract => contract && typeof contract.id === 'string' && contract.claimed)
+        .map(contract => [contract.id, true])
+    );
+
+    const washTarget = day % 2 === 0 ? 4 : 3;
+    const revenueTarget = 1500 + (day % 3) * 500;
+    const perfectTarget = day % 2 === 0 ? 1 : 2;
+
+    const definitions = [
+      {
+        id: 'wash',
+        title: 'Поток клиентов',
+        description: `Вымой ${washTarget} автомобиля за смену`,
+        target: washTarget,
+        progressKey: 'todayCarsWashed',
+        reward: 8000 + ((day - 1) % 4) * 1000,
+      },
+      {
+        id: 'revenue',
+        title: 'План продаж',
+        description: `Получи ${revenueTarget.toLocaleString('ru-RU')} ₽ выручки от моек`,
+        target: revenueTarget,
+        progressKey: 'todayRevenue',
+        reward: 10000 + ((day - 1) % 3) * 1000,
+      },
+      {
+        id: 'quality',
+        title: 'Безупречный сервис',
+        description: `Выполни ${perfectTarget} ${perfectTarget === 1 ? 'мойку' : 'мойки'} с качеством от 85%`,
+        target: perfectTarget,
+        progressKey: 'todayPerfectWashes',
+        reward: 12000 + ((day - 1) % 4) * 1000,
+      },
+    ];
+
+    this.dailyContractDay = day;
+    this.dailyContracts = definitions.map(contract => ({
+      ...contract,
+      claimed: previousClaims.get(contract.id) === true,
+    }));
+  }
+
+  getDailyContracts() {
+    if (this.dailyContractDay !== this.day || !Array.isArray(this.dailyContracts) || this.dailyContracts.length !== 3) {
+      this._refreshDailyContracts();
+    }
+
+    return this.dailyContracts.map(contract => {
+      const rawProgress = Number(this.stats[contract.progressKey]) || 0;
+      const progress = Math.max(0, contract.progressKey === 'todayRevenue' ? rawProgress : Math.floor(rawProgress));
+      const completed = progress >= contract.target;
+      return {
+        ...contract,
+        progress,
+        completed,
+        claimable: completed && !contract.claimed,
+      };
+    });
+  }
+
+  claimDailyContract(contractId) {
+    const contract = this.getDailyContracts().find(item => item.id === contractId);
+    if (!contract) return { success: false, reason: 'Контракт не найден' };
+    if (contract.claimed) return { success: false, reason: 'Награда уже получена' };
+    if (!contract.completed) return { success: false, reason: 'Контракт ещё не выполнен' };
+
+    const stored = this.dailyContracts.find(item => item.id === contractId);
+    if (!stored) return { success: false, reason: 'Контракт не найден' };
+
+    stored.claimed = true;
+    this.money += stored.reward;
+    this._logFinance('income', `Награда за контракт «${stored.title}»`, stored.reward);
+    this.emit('stateChanged');
+
+    return { success: true, reward: stored.reward, title: stored.title };
+  }
+
   nextDay() {
     this.day++;
     this.shiftTimeRemaining = BALANCE.time.shiftDurationMs;
     this.stats.todayCarsWashed = 0;
     this.stats.todayRevenue = 0;
     this.stats.todayExpenses = 0;
+    this.stats.todayPerfectWashes = 0;
+    this._refreshDailyContracts();
 
     if (this.marketingActive) {
       this.marketingDaysLeft--;
@@ -570,6 +658,8 @@ class GameState {
       employees: this.employees.map(e => ({ ...e })),
       servicePrice: this.servicePrice,
       stats: { ...this.stats },
+      dailyContractDay: this.dailyContractDay,
+      dailyContracts: this.dailyContracts.map(contract => ({ ...contract })),
       financialLog: this.financialLog.slice(-100),
       storyFlags: { ...this.storyFlags },
       tutorialCompleted: this.tutorialCompleted,
@@ -595,6 +685,8 @@ class GameState {
     this.saveVersion = data.saveVersion;
     this.initialized = data.initialized;
     this.day = data.day || 1;
+    this.dailyContractDay = typeof data.dailyContractDay === 'number' ? data.dailyContractDay : 0;
+    this.dailyContracts = Array.isArray(data.dailyContracts) ? data.dailyContracts : [];
     this.money = typeof data.money === 'number' && isFinite(data.money) ? data.money : BALANCE.startingBalance;
     this.location = data.location;
     this.equipmentType = data.equipmentType || 'used';
@@ -642,6 +734,9 @@ class GameState {
         if (post) post.broken = !!savedPost.broken;
       }
     }
+
+    const savedContractState = this.dailyContractDay === this.day ? this.dailyContracts : null;
+    this._refreshDailyContracts(savedContractState);
 
     this.shiftActive = true;
     this.shiftTimeRemaining = BALANCE.time.shiftDurationMs;
