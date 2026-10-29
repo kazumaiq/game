@@ -10,6 +10,18 @@ function genId(prefix = 'op') {
   return `${prefix}_${Date.now()}_${_nextId++}`;
 }
 
+const CAREER_ACHIEVEMENTS = [
+  { id: 'first_wash', title: 'Первый клиент', description: 'Заверши первую мойку', metric: 'totalCarsWashed', target: 1, reward: 2500 },
+  { id: 'ten_washes', title: 'Стабильный поток', description: 'Обслужи 10 автомобилей за карьеру', metric: 'totalCarsWashed', target: 10, reward: 10000 },
+  { id: 'twentyfive_washes', title: 'Мастер смены', description: 'Обслужи 25 автомобилей за карьеру', metric: 'totalCarsWashed', target: 25, reward: 25000 },
+  { id: 'perfect_five', title: 'Чистая работа', description: 'Получи 5 оценок за идеальную мойку', metric: 'totalPerfectWashes', target: 5, reward: 10000 },
+  { id: 'perfect_twenty', title: 'Стандарт премиум', description: 'Получи 20 оценок за идеальную мойку', metric: 'totalPerfectWashes', target: 20, reward: 40000 },
+  { id: 'third_bay', title: 'Больше мощности', description: 'Открой третий моечный бокс', metric: 'openBays', target: 3, reward: 15000 },
+  { id: 'four_bays', title: 'Своя мини-сеть', description: 'Открой все 4 моечных бокса', metric: 'openBays', target: 4, reward: 50000 },
+  { id: 'reputation_75', title: 'Имя на районе', description: 'Подними репутацию до 75', metric: 'reputation', target: 75, reward: 12000 },
+  { id: 'reputation_90', title: 'Городской фаворит', description: 'Подними репутацию до 90', metric: 'reputation', target: 90, reward: 30000 },
+];
+
 class GameState {
   constructor() {
     this.reset();
@@ -27,6 +39,7 @@ class GameState {
     this.location = null;
     this.equipmentType = 'used'; // 'used', 'newStandard', 'premiumAuto'
     this.reputation = BALANCE.reputation.initial;
+    this.achievements = {};
 
     // Оформленные документы
     this.documents = {
@@ -58,6 +71,7 @@ class GameState {
 
     this.stats = {
       totalCarsWashed: 0,
+      totalPerfectWashes: 0,
       totalRevenue: 0,
       totalExpenses: 0,
       todayCarsWashed: 0,
@@ -210,11 +224,13 @@ class GameState {
 
     if (quality >= 0.85) {
       this.stats.todayPerfectWashes++;
+      this.stats.totalPerfectWashes = (this.stats.totalPerfectWashes || 0) + 1;
       this.changeReputation(BALANCE.reputation.goodServiceBonus);
     } else if (quality < 0.5) {
       this.changeReputation(BALANCE.reputation.poorServicePenalty);
     }
 
+    this._checkCareerAchievements();
     this.emit('stateChanged');
     return price - supplyCost;
   }
@@ -296,6 +312,32 @@ class GameState {
     return { success: true, newLevel: currentLevel + 1 };
   }
 
+  getCareerAchievements() {
+    const openBays = this.posts.filter(post => post.unlocked !== false).length;
+    return CAREER_ACHIEVEMENTS.map(item => {
+      let value = 0;
+      if (item.metric === 'openBays') value = openBays;
+      else if (item.metric === 'reputation') value = Math.round(this.reputation);
+      else value = Number(this.stats[item.metric]) || 0;
+      return { ...item, progress: Math.min(item.target, value), unlocked: !!this.achievements[item.id] };
+    });
+  }
+
+  _checkCareerAchievements() {
+    const newlyUnlocked = [];
+    for (const achievement of this.getCareerAchievements()) {
+      if (achievement.unlocked || achievement.progress < achievement.target) continue;
+      this.achievements[achievement.id] = true;
+      this.money += achievement.reward;
+      this.stats.totalRevenue += achievement.reward;
+      this._logFinance('income', 'Достижение: ' + achievement.title, achievement.reward);
+      newlyUnlocked.push({ ...achievement, unlocked: true });
+    }
+    for (const achievement of newlyUnlocked) this.emit('achievementUnlocked', achievement);
+    if (newlyUnlocked.length) this.emit('stateChanged');
+    return newlyUnlocked;
+  }
+
   /** Открыть новый моечный бокс за счёт средств бизнеса. */
   unlockPost(postId) {
     const post = this.posts.find(p => p.id === postId);
@@ -310,6 +352,7 @@ class GameState {
     this.stats.totalExpenses += price;
     this.stats.todayExpenses += price;
     this._logFinance('expense', 'Открытие ' + (postId === 'post_3' ? 'третьего' : 'четвёртого') + ' бокса', price);
+    this._checkCareerAchievements();
     this.emit('stateChanged');
     return { success: true, postId, price };
   }
@@ -536,6 +579,7 @@ class GameState {
       BALANCE.reputation.min,
       Math.min(BALANCE.reputation.max, this.reputation + amount)
     );
+    this._checkCareerAchievements();
   }
 
   startMarketing() {
@@ -684,6 +728,7 @@ class GameState {
       documents: { ...this.documents },
       suppliesStock: this.suppliesStock,
       reputation: this.reputation,
+      achievements: { ...this.achievements },
       upgrades: { ...this.upgrades },
       employees: this.employees.map(e => ({ ...e })),
       servicePrice: this.servicePrice,
@@ -757,6 +802,7 @@ class GameState {
     this.buyoutOffered = !!data.buyoutOffered;
     this.buyoutAccepted = !!data.buyoutAccepted;
 
+    if (data.achievements && typeof data.achievements === 'object') this.achievements = { ...data.achievements };
     if (data.settings) this.settings = { ...this.settings, ...data.settings };
     if (Array.isArray(data.posts)) {
       for (const savedPost of data.posts) {
