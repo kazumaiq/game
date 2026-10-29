@@ -535,6 +535,8 @@ function _generateWashBay(g, key, broken = false) {
 /** 7. Персонаж оператора в профессиональной униформе с деталями */
 function _generateCharacter(g, key, frame = 0) {
   g.clear();
+  // Render at 2× source resolution; sprites are drawn at half scale in the world.
+  g.scaleCanvas(2, 2);
   const W = 46;
   const H = 60;
 
@@ -638,12 +640,21 @@ function _generateCharacter(g, key, frame = 0) {
   g.fillRect(19, 7, 4, 2);
   g.fillRect(24, 7, 4, 2);
 
-  g.generateTexture(key, W, H);
+  // Additional contour, face shading and reflective piping remain sharp on Retina displays.
+  g.lineStyle(1.1, 0x07111f, 0.82);
+  g.strokeRoundedRect(11, 18, 24, 20, 5);
+  g.lineStyle(1, 0xffffff, 0.25);
+  g.strokeLineShape(new Phaser.Geom.Line(14, 20, 14, 28));
+  g.fillStyle(0xffffff, 0.18);
+  g.fillCircle(20, 12, 2);
+  g.generateTexture(key, W * 2, H * 2);
 }
 
 /** 8. Создание высокодетализированного автомобиля в 2.5D ракурсе */
 function _generateCar(g, key, conf, state) {
   g.clear();
+  // Higher source resolution reduces blur from camera zoom and small mobile displays.
+  g.scaleCanvas(2, 2);
   const W = conf.w;
   const H = conf.h;
 
@@ -907,7 +918,21 @@ function _generateCar(g, key, conf, state) {
   g.fillStyle(0x38bdf8, state === 'clean' ? 0.13 : 0.06);
   g.fillRoundedRect(W * 0.22, H - 9, W * 0.52, 1.5, 1);
 
-  g.generateTexture(key, W, H);
+  // Extra body-panel seams and brighter specular streaks are baked into the 2× texture.
+  g.lineStyle(1, 0x08101c, 0.68);
+  g.strokeRoundedRect(9, 9, W - 18, H - 18, 8);
+  g.lineStyle(1, 0xffffff, state === 'clean' ? 0.42 : 0.13);
+  g.lineBetween(15, 10, W - 23, 10);
+  g.lineStyle(1, conf.accentColor, state === 'clean' ? 0.7 : 0.24);
+  g.lineBetween(14, H - 12, W - 16, H - 12);
+  if (state === 'clean') {
+    g.fillStyle(0xffffff, 0.3);
+    g.fillRoundedRect(W * 0.48, H * 0.2, W * 0.18, 1.5, 1);
+    g.fillStyle(conf.accentColor, 0.16);
+    g.fillEllipse(W * 0.65, H * 0.72, W * 0.22, 4);
+  }
+
+  g.generateTexture(key, W * 2, H * 2);
 }
 
 /** 9. Частицы брызг, пены и воды */
@@ -1009,6 +1034,8 @@ function _generateDecorations(g) {
 /** 11. Сотрудник автомойки (профессиональная форма, отличная от игрока) */
 function _generateEmployee(g, key, frame = 0) {
   g.clear();
+  // Match player texture resolution so the two character types stay equally crisp.
+  g.scaleCanvas(2, 2);
   const W = 46;
   const H = 60;
 
@@ -1111,8 +1138,14 @@ function _generateEmployee(g, key, frame = 0) {
   g.fillStyle(0x38bdf8, 0.95);
   g.fillRect(18, 7, 4, 2);
   g.fillRect(24, 7, 4, 2);
+  g.lineStyle(1.1, 0x111827, 0.84);
+  g.strokeRoundedRect(11, 18, 24, 20, 5);
+  g.lineStyle(1, 0xffffff, 0.26);
+  g.lineBetween(15, 20, 15, 29);
+  g.fillStyle(0xffffff, 0.2);
+  g.fillCircle(20, 12, 2);
 
-  g.generateTexture(key, W, H);
+  g.generateTexture(key, W * 2, H * 2);
 }
 
 export default generateAssets;

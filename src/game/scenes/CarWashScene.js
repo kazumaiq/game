@@ -115,8 +115,7 @@ export default class CarWashScene extends Phaser.Scene {
 
     // Компенсируем уменьшение камеры, чтобы персонаж оставался заметным на портретном экране.
     if (this.player) {
-      const playerScale = portraitPhone ? 1.35 : 1;
-      this.player.setScale(playerScale);
+      this.player.setScale(portraitPhone ? 0.675 : 0.5);
     }
   }
 
@@ -365,9 +364,11 @@ export default class CarWashScene extends Phaser.Scene {
       'player_idle'
     );
     this.player.setDepth(15);
+    this.player.setScale(0.5);
     this.player.setCollideWorldBounds(true);
-    this.player.body.setSize(24, 28);
-    this.player.body.setOffset(9, 16);
+    // Body dimensions/offsets are doubled because the display scale is 0.5.
+    this.player.body.setSize(48, 56);
+    this.player.body.setOffset(18, 32);
 
     if (gameState.tutorialCompleted) {
       this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
@@ -820,7 +821,7 @@ export default class CarWashScene extends Phaser.Scene {
       audioManager.play('carDepart');
       this.tweens.killTweensOf(sprite);
       delete sprite._queueTargetX;
-      sprite.setScale(1);
+      sprite.setScale(0.5);
       this.tweens.add({
         targets: sprite,
         x: WORLD.exit.x + 80,
@@ -869,6 +870,7 @@ export default class CarWashScene extends Phaser.Scene {
     const targetY = WORLD.queueStart.y;
 
     const sprite = this.add.image(WORLD.entrance.x - 30, WORLD.entrance.y, `car_${classId}_dirty`);
+    sprite.setScale(0.5);
     sprite.setDepth(12 + WORLD.entrance.y * 0.01);
     sprite._queueTargetX = targetX;
     this._carSprites[car.id] = sprite;
@@ -900,7 +902,7 @@ export default class CarWashScene extends Phaser.Scene {
     // both tweens on x/y concurrently and the car stays at the entrance or disappears.
     this.tweens.killTweensOf(sprite);
     delete sprite._queueTargetX;
-    sprite.setScale(1.08);
+    sprite.setScale(0.54);
     sprite.setDepth(20 + postPos.y * 0.01);
 
     this.tweens.add({
@@ -1082,7 +1084,7 @@ export default class CarWashScene extends Phaser.Scene {
 
   _spawnEmployeeSprite(emp, index) {
     const rest = this._getEmployeeRestPos(emp.id);
-    const sprite = this.add.image(rest.x, rest.y, 'employee_idle').setDepth(14);
+    const sprite = this.add.image(rest.x, rest.y, 'employee_idle').setDepth(14).setScale(0.5);
 
     const label = this.add.text(rest.x, rest.y - 32, emp.name, {
       fontSize: '10px',

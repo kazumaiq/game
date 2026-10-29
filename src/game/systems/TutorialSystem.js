@@ -102,7 +102,8 @@ export class TutorialSystem {
           if (!sprite || !sprite.active) {
             const pos = { x: 300, y: 310 };
             sprite = scene.add.image(pos.x, pos.y + 12, 'car_sedan_dirty');
-            sprite.setDepth(10);
+            sprite.setScale(0.5);
+            sprite.setDepth(20 + (pos.y + 12) * 0.01);
             scene._carSprites[car.id] = sprite;
           }
         }
