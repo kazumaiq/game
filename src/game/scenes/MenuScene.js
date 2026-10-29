@@ -18,14 +18,32 @@ export default class MenuScene extends Phaser.Scene {
 
     this._objects = [];
 
-    // === ФОНОВЫЙ ГРАДИЕНТ: ночное небо → горизонт ===
+    // === КИНОШНЫЙ НЕБОСКЛОН: глубокий индиго переходит в тёплый закат ===
     const skyGrad = this.add.graphics();
     const skyH = Math.floor(height * 0.45);
+    const skyStops = [
+      { at: 0, r: 7, g: 13, b: 29 },
+      { at: 0.34, r: 23, g: 24, b: 51 },
+      { at: 0.63, r: 81, g: 39, b: 67 },
+      { at: 0.84, r: 171, g: 70, b: 69 },
+      { at: 1, r: 239, g: 133, b: 79 },
+    ];
     for (let y = 0; y < skyH; y++) {
-      const t = y / skyH;
-      const r = Math.floor(6 + t * 8);
-      const gg = Math.floor(10 + t * 14);
-      const b = Math.floor(18 + t * 28);
+      const t = y / Math.max(1, skyH - 1);
+      let lower = skyStops[0];
+      let upper = skyStops[skyStops.length - 1];
+      for (let i = 1; i < skyStops.length; i++) {
+        if (t <= skyStops[i].at) {
+          lower = skyStops[i - 1];
+          upper = skyStops[i];
+          break;
+        }
+      }
+      const span = Math.max(0.001, upper.at - lower.at);
+      const mix = Phaser.Math.Clamp((t - lower.at) / span, 0, 1);
+      const r = Math.round(Phaser.Math.Linear(lower.r, upper.r, mix));
+      const gg = Math.round(Phaser.Math.Linear(lower.g, upper.g, mix));
+      const b = Math.round(Phaser.Math.Linear(lower.b, upper.b, mix));
       skyGrad.fillStyle(Phaser.Display.Color.GetColor(r, gg, b));
       skyGrad.fillRect(0, y, width, 1);
     }
@@ -41,10 +59,24 @@ export default class MenuScene extends Phaser.Scene {
       starsGfx.fillCircle(sx, sy, radius);
     }
 
-    // === ЛИНИЯ ГОРИЗОНТА / ГОРОДСКИЕ СИЛУЭТЫ ===
+    // === ЗАКАТНЫЙ СВЕТ И СОЛНЕЧНЫЙ ДИСК ЗА СИЛУЭТОМ ГОРОДА ===
     const horizonY = skyH;
+    const horizonGlow = this.add.graphics();
+    const glowX = width * 0.5;
+    const glowY = horizonY - Math.min(18, height * 0.025);
+    const sunRadius = Math.min(width, height) * 0.105;
+    horizonGlow.fillStyle(0xfb923c, 0.035);
+    horizonGlow.fillCircle(glowX, glowY, sunRadius * 2.25);
+    horizonGlow.fillStyle(0xf97316, 0.065);
+    horizonGlow.fillCircle(glowX, glowY, sunRadius * 1.65);
+    horizonGlow.fillStyle(0xfbbf7a, 0.18);
+    horizonGlow.fillCircle(glowX, glowY, sunRadius);
+    horizonGlow.fillStyle(0xffd6a0, 0.32);
+    horizonGlow.fillCircle(glowX, glowY, sunRadius * 0.72);
+
+    // === ЛИНИЯ ГОРИЗОНТА / ГОРОДСКИЕ СИЛУЭТЫ ===
     const cityGfx = this.add.graphics();
-    cityGfx.fillStyle(0x0c1220, 0.9);
+    cityGfx.fillStyle(0x11172a, 0.9);
     const buildingCount = Math.floor(width / 28) + 2;
     for (let i = 0; i < buildingCount; i++) {
       const bx = i * 28 - 10 + Math.random() * 6;
@@ -70,10 +102,10 @@ export default class MenuScene extends Phaser.Scene {
     // Градиент мокрого асфальта
     for (let y = groundY; y < height; y++) {
       const t = (y - groundY) / (height - groundY);
-      const r = Math.floor(14 + t * 8);
-      const gg = Math.floor(18 + t * 10);
-      const b = Math.floor(26 + t * 14);
-      groundGfx.fillStyle(Phaser.Display.Color.GetColor(r, gg, b), 0.95);
+      const r = Math.floor(15 + t * 20);
+      const gg = Math.floor(17 + t * 8);
+      const b = Math.floor(28 + t * 10);
+      groundGfx.fillStyle(Phaser.Display.Color.GetColor(r, gg, b), 0.96);
       groundGfx.fillRect(0, y, width, 1);
     }
     // Блики на мокром асфальте
@@ -82,8 +114,9 @@ export default class MenuScene extends Phaser.Scene {
       const rx = Math.random() * width;
       const ry = groundY + 20 + Math.random() * (height - groundY - 40);
       const rw = 12 + Math.random() * 40;
-      reflGfx.fillStyle(0x0ea5e9, 0.03 + Math.random() * 0.04);
-      reflGfx.fillRoundedRect(rx, ry, rw, 1, 0);
+      const warmReflection = i % 4 === 0;
+      reflGfx.fillStyle(warmReflection ? 0xfb923c : 0x38bdf8, warmReflection ? 0.025 + Math.random() * 0.035 : 0.03 + Math.random() * 0.04);
+      reflGfx.fillRoundedRect(rx, ry, rw * (warmReflection ? 0.85 : 1), 1 + (i % 3 === 0 ? 1 : 0), 0);
     }
 
     // === ЦЕНТРАЛЬНАЯ КОМПОЗИЦИЯ: ЗДАНИЕ АВТОМОЙКИ ===
