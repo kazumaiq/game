@@ -412,6 +412,15 @@ export default class CarWashScene extends Phaser.Scene {
     const stick = document.getElementById('joystick-stick');
     const actionBtn = document.getElementById('mobile-action-btn');
 
+    // Пользовательская настройка меню действительно управляет видимостью джойстика.
+    let joystickEnabled = true;
+    try {
+      joystickEnabled = localStorage.getItem('carwash_joystick_enabled') !== 'false';
+    } catch (e) {
+      // При запрещённом localStorage оставляем безопасное управление по умолчанию.
+    }
+    if (zone) zone.style.display = joystickEnabled ? '' : 'none';
+
     let touchId = null;
 
     const updateStick = (clientX, clientY) => {
