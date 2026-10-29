@@ -121,93 +121,44 @@ export default class CarWashScene extends Phaser.Scene {
   }
 
   _createEnvironment() {
-    // 1. Зеленый стриженый газон
-    for (let x = 0; x < WORLD.width; x += 64) {
-      for (let y = 0; y < WORLD.height; y += 64) {
-        this.add.image(x + 32, y + 32, 'lawn_tile').setDepth(0);
-      }
-    }
+    // Детализированная векторная сцена: резкие SVG-материалы масштабируются без мыла.
+    const environment = this.add.image(WORLD.width / 2, WORLD.height / 2, 'wash-yard-art')
+      .setDisplaySize(WORLD.width, WORLD.height)
+      .setDepth(0);
 
-    const yardW = 824;
-    const yardH = 472;
-    const yardX = WORLD.width / 2;
-    const yardY = 270;
+    // Здание и боксы отдельными слоями, чтобы машины и сотрудники оставались игровыми спрайтами.
+    this._building = this.add.image(WORLD.building.x, WORLD.building.y, 'wash-building-art')
+      .setDisplaySize(560, 194)
+      .setDepth(5);
 
-    // 2. Бордюрный камень площадки (бетон с объемной тенью)
-    const borderShadow = this.add.rectangle(yardX + 2, yardY + 4, yardW + 12, yardH + 12, 0x070a10, 0.45);
-    borderShadow.setDepth(1);
-    const border = this.add.rectangle(yardX, yardY, yardW + 8, yardH + 8, 0x334155);
-    border.setDepth(1);
-
-    // 3. Текстурированный графитовый асфальт автомойки
-    const yard = this.add.tileSprite(yardX, yardY, yardW, yardH, 'asphalt_ground');
-    yard.setDepth(2);
-
-    // Неповторяющийся верхний слой фактуры на всей площадке:
-    // длинные влажные потёки и разрозненные блики убирают ощущение дешёвой повторяющейся плитки.
-    const surfaceDetail = this.add.graphics().setDepth(2.12);
-    for (let i = 0; i < 74; i++) {
-      const x = 68 + ((i * 137 + (i % 7) * 29) % (yardW - 136));
-      const y = 76 + ((i * 83 + (i % 9) * 17) % (yardH - 152));
-      const rx = 3 + (i % 5) * 2;
-      const ry = 1 + (i % 3);
-      const color = i % 6 === 0 ? 0xfb923c : (i % 3 === 0 ? 0x67e8f9 : 0x94a3b8);
-      surfaceDetail.fillStyle(color, i % 6 === 0 ? 0.075 : 0.045 + (i % 3) * 0.012);
-      surfaceDetail.fillEllipse(yardX - yardW / 2 + x, yardY - yardH / 2 + y, rx * 2, ry * 2);
-    }
-    for (let i = 0; i < 22; i++) {
-      const x = yardX - yardW / 2 + 36 + ((i * 173) % (yardW - 72));
-      const y = yardY - yardH / 2 + 28 + ((i * 97) % (yardH - 56));
-      const length = 8 + (i % 6) * 7;
-      surfaceDetail.fillStyle(i % 5 === 0 ? 0xfb923c : 0xdbeafe, i % 5 === 0 ? 0.09 : 0.065);
-      surfaceDetail.fillRoundedRect(x, y, length, i % 3 === 0 ? 2 : 1, 1);
-      if (i % 4 === 0) {
-        surfaceDetail.fillStyle(0x67e8f9, 0.045);
-        surfaceDetail.fillRoundedRect(x + 3, y + 3, length * 0.55, 1, 1);
-      }
-    }
-
-    // 4. Дорожное полотно с разделительной полосой
-    const road = this.add.tileSprite(WORLD.width / 2, WORLD.roadY, WORLD.width, 80, 'road_strip');
-    road.setDepth(3);
-
-    // 5. Разметка на асфальте (дорожки, стрелки въезда/выезда, мокрые пятна)
-    this._createGroundMarkings();
-
-    // 5b. Кинематографичный свет и отражения на влажном покрытии.
-    this._createAmbientLighting();
-
-    // 6. Главное административное здание автомойки
-    this._building = this.add.image(WORLD.building.x, WORLD.building.y, 'building_complex');
-    this._building.setDepth(7);
-
-    // 7. Моечные боксы
     this._postSprites = [];
     this._postStatusLabels = [];
     for (let i = 0; i < WORLD.posts.length; i++) {
       const pos = WORLD.posts[i];
       const postData = gameState.posts[i];
-      const tex = postData.broken ? 'wash_bay_broken' : 'wash_bay_normal';
-      
-      const sprite = this.add.image(pos.x, pos.y, tex).setDepth(6);
-      
-      const lbl = this.add.text(pos.x, pos.y - 78, `${pos.label} • СВОБОДЕН`, {
+      const texture = postData.broken ? 'wash-bay-broken-art' : 'wash-bay-art';
+      const sprite = this.add.image(pos.x, pos.y, texture)
+        .setDisplaySize(300, 192)
+        .setDepth(6);
+
+      const label = this.add.text(pos.x, pos.y - 103, `${pos.label} • СВОБОДЕН`, {
         fontSize: '16px',
-        color: '#67e8f9',
+        color: '#8df4ff',
         backgroundColor: 'rgba(5, 12, 24, 0.98)',
-        padding: { x: 10, y: 5 },
+        padding: { x: 12, y: 7 },
         fontFamily: 'Arial, Helvetica, sans-serif',
         fontStyle: 'bold',
         stroke: '#07111f',
-        strokeThickness: 2,
-        shadow: { offsetX: 0, offsetY: 1, color: '#000000', blur: 2, fill: true },
+        strokeThickness: 3,
+        shadow: { offsetX: 0, offsetY: 2, color: '#000000', blur: 4, fill: true },
       }).setOrigin(0.5).setDepth(8);
 
       this._postSprites.push(sprite);
-      this._postStatusLabels.push(lbl);
+      this._postStatusLabels.push(label);
     }
 
-    // 8. Декорации и освещение
+    this._createGroundMarkings();
+    this._createAmbientLighting();
     this._createScenery();
 
     this.physics.world.setBounds(20, 170, WORLD.width - 40, WORLD.height - 210);
@@ -693,7 +644,7 @@ export default class CarWashScene extends Phaser.Scene {
           const result = gameState.repairPost(post.id);
           if (result.success) {
             audioManager.play('success');
-            this._postSprites[i].setTexture('wash_bay_normal');
+            this._postSprites[i].setTexture('wash-bay-art');
             showToast('Бокс успешно отремонтирован!', 'success');
             this._updatePostStatuses();
           } else {
@@ -857,7 +808,7 @@ export default class CarWashScene extends Phaser.Scene {
       if (idx !== -1) {
         audioManager.play('warningBeep');
         gameState.breakPost(postId);
-        this._postSprites[idx].setTexture('wash_bay_broken');
+        this._postSprites[idx].setTexture('wash-bay-broken-art');
         showToast(`${WORLD.posts[idx].label} вышел из строя! Подойди для починки.`, 'warning');
       }
     }
@@ -867,6 +818,9 @@ export default class CarWashScene extends Phaser.Scene {
     const sprite = this._carSprites[carId];
     if (sprite) {
       audioManager.play('carDepart');
+      this.tweens.killTweensOf(sprite);
+      delete sprite._queueTargetX;
+      sprite.setScale(1);
       this.tweens.add({
         targets: sprite,
         x: WORLD.exit.x + 80,
@@ -915,7 +869,8 @@ export default class CarWashScene extends Phaser.Scene {
     const targetY = WORLD.queueStart.y;
 
     const sprite = this.add.image(WORLD.entrance.x - 30, WORLD.entrance.y, `car_${classId}_dirty`);
-    sprite.setDepth(10);
+    sprite.setDepth(12 + WORLD.entrance.y * 0.01);
+    sprite._queueTargetX = targetX;
     this._carSprites[car.id] = sprite;
 
     this.tweens.add({
@@ -924,6 +879,11 @@ export default class CarWashScene extends Phaser.Scene {
       y: targetY,
       duration: 1100,
       ease: 'Power2',
+      onComplete: () => {
+        if (sprite.active && sprite._queueTargetX === targetX) {
+          sprite.setPosition(targetX, targetY);
+        }
+      },
     });
   }
 
@@ -936,12 +896,25 @@ export default class CarWashScene extends Phaser.Scene {
     const assigned = gameState.assignCarToPost(carId, postData.id);
     if (!assigned) return;
 
+    // IMPORTANT: cancel the old spawn/queue tween first. Otherwise Phaser runs
+    // both tweens on x/y concurrently and the car stays at the entrance or disappears.
+    this.tweens.killTweensOf(sprite);
+    delete sprite._queueTargetX;
+    sprite.setScale(1.08);
+    sprite.setDepth(20 + postPos.y * 0.01);
+
     this.tweens.add({
       targets: sprite,
       x: postPos.x,
       y: postPos.y + 12,
       duration: 850,
       ease: 'Power2',
+      onComplete: () => {
+        if (sprite.active) {
+          sprite.setPosition(postPos.x, postPos.y + 12);
+          sprite.setDepth(20 + sprite.y * 0.01);
+        }
+      },
     });
   }
 
@@ -984,13 +957,21 @@ export default class CarWashScene extends Phaser.Scene {
       const sprite = this._carSprites[carId];
       if (!sprite) continue;
       const targetX = WORLD.queueStart.x + qi * WORLD.queueSpacing;
-      if (Math.abs(sprite.x - targetX) > 5) {
+      if (Math.abs(sprite.x - targetX) > 5 && sprite._queueTargetX !== targetX) {
+        // Queue slots may shift after another vehicle leaves; retarget once only.
+        this.tweens.killTweensOf(sprite);
+        sprite._queueTargetX = targetX;
         this.tweens.add({
           targets: sprite,
           x: targetX,
           y: WORLD.queueStart.y,
-          duration: 350,
+          duration: 420,
           ease: 'Power2',
+          onComplete: () => {
+            if (sprite.active && sprite._queueTargetX === targetX) {
+              sprite.setPosition(targetX, WORLD.queueStart.y);
+            }
+          },
         });
       }
     }
@@ -1141,7 +1122,7 @@ export default class CarWashScene extends Phaser.Scene {
             if (post && post.broken) {
               const res = gameState.repairPost(post.id);
               if (res.success) {
-                this._postSprites[bayIndex].setTexture('wash_bay_normal');
+                this._postSprites[bayIndex].setTexture('wash-bay-art');
                 showToast(`${emp.name} починил ${WORLD.posts[bayIndex].label}!`, 'success');
                 audioManager.play('success');
                 this._updatePostStatuses();
