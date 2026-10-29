@@ -9,6 +9,7 @@ import { showUpgradePanel } from './UpgradePanelUI.js';
 import { showDailyContractsPanel } from './DailyContractsUI.js';
 import { showToast } from './ToastUI.js';
 import { audioManager } from '../game/systems/AudioManager.js';
+import { getShiftClock } from '../game/systems/DayCycle.js';
 
 let _hudElement = null;
 let _scene = null;
@@ -30,6 +31,11 @@ export function createHUD(scene) {
     <div class="hud-bar">
       <!-- Блок информации: Баланс, День, Репутация, Очередь -->
       <div class="hud-pill-group">
+        <div class="hud-pill time phase-morning" id="hud-time-pill" title="Время внутри текущей смены">
+          <span class="icon" id="hud-time-icon">🌤</span>
+          <span class="val" id="hud-clock">08:00</span>
+          <span class="lbl" id="hud-phase">УТРО</span>
+        </div>
         <div class="hud-pill money" id="hud-money-pill">
           <span class="icon">₽</span>
           <span class="val" id="hud-money">0 ₽</span>
@@ -125,12 +131,26 @@ export function updateHUD() {
   const repEl = document.getElementById('hud-rep');
   const queueEl = document.getElementById('hud-queue');
   const shiftFill = document.getElementById('hud-shift-fill');
+  const timePill = document.getElementById('hud-time-pill');
+  const clockEl = document.getElementById('hud-clock');
+  const phaseEl = document.getElementById('hud-phase');
+  const timeIconEl = document.getElementById('hud-time-icon');
 
   if (moneyEl) {
     moneyEl.textContent = fmt(gameState.money);
     moneyEl.className = gameState.money < 0 ? 'val negative' : 'val';
   }
   if (dayEl) dayEl.textContent = gameState.day;
+
+  const shiftClock = getShiftClock(gameState.shiftTimeRemaining, BALANCE.time);
+  if (clockEl) clockEl.textContent = shiftClock.clock;
+  if (phaseEl) phaseEl.textContent = shiftClock.label;
+  if (timeIconEl) timeIconEl.textContent = shiftClock.icon;
+  if (timePill) {
+    timePill.classList.remove('phase-morning', 'phase-day', 'phase-golden', 'phase-evening');
+    timePill.classList.add(`phase-${shiftClock.phase}`);
+    timePill.title = `${shiftClock.description} · ${shiftClock.clock}`;
+  }
   if (repEl) repEl.textContent = Math.round(gameState.reputation);
   if (queueEl) queueEl.textContent = gameState.queue.length;
 
