@@ -203,6 +203,14 @@ function _showSettings() {
           '<p class="settings-note">Звуковые эффекты генерируются самой игрой. Настройки сохраняются на этом устройстве.</p>',
         '</div>',
         '<div class="settings-group">',
+          '<div class="settings-label">Графика</div>',
+          '<div class="settings-row">',
+            '<span class="settings-desc">Атмосферные эффекты</span>',
+            '<label class="settings-toggle"><input type="checkbox" id="settings-effects" ' + (readPreference('carwash_effects_enabled', 'true') !== 'false' ? 'checked' : '') + ' /><span class="toggle-track"></span></label>',
+          '</div>',
+          '<p class="settings-note">Пена, дождь и частицы. Отключите на слабом устройстве.</p>',
+        '</div>',
+        '<div class="settings-group">',
           '<div class="settings-label">Управление</div>',
           '<div class="settings-row">',
             '<span class="settings-desc">Виртуальный джойстик</span>',
@@ -247,6 +255,12 @@ function _showSettings() {
 
   backdrop.querySelector('#settings-volume').addEventListener('input', event => {
     audioManager.setVolume(Number(event.target.value) / 100);
+  });
+
+  backdrop.querySelector('#settings-effects').addEventListener('change', event => {
+    const enabled = event.target.checked;
+    writePreference('carwash_effects_enabled', enabled ? 'true' : 'false');
+    audioManager.play('buttonClick');
   });
 
   backdrop.querySelector('#settings-joystick').addEventListener('change', event => {

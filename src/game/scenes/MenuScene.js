@@ -7,6 +7,14 @@ import saveSystem from '../systems/SaveSystem.js';
 import gameState from '../systems/GameState.js';
 import { showMenu, hideMenu } from '../../ui/MenuUI.js';
 
+function effectsEnabled() {
+  try {
+    return localStorage.getItem('carwash_effects_enabled') !== 'false';
+  } catch {
+    return true;
+  }
+}
+
 export default class MenuScene extends Phaser.Scene {
   constructor() {
     super({ key: 'MenuScene' });
@@ -251,7 +259,7 @@ export default class MenuScene extends Phaser.Scene {
     // Пена на машине
     const foamGfx = this.add.graphics();
     this._foamBubbles = [];
-    for (let i = 0; i < 22; i++) {
+    for (let i = 0; i < (effectsEnabled() ? 22 : 6); i++) {
       const bx = carX + 10 + Math.random() * (carW - 20);
       const by = carY + 2 + Math.random() * (carH * 0.7);
       const br = 2 + Math.random() * 5;
@@ -300,7 +308,7 @@ export default class MenuScene extends Phaser.Scene {
     const particleGfx = this.add.graphics();
     this._particleGfx = particleGfx;
 
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < (effectsEnabled() ? 30 : 8); i++) {
       this._waterParticles.push({
         x: bayX + Math.random() * bayW,
         y: bayY + Math.random() * bayH,
@@ -318,7 +326,7 @@ export default class MenuScene extends Phaser.Scene {
     // === МЕЛКАЯ ДОЖДЕВАЯ ПЫЛЬ ===
     this._rainDrops = [];
     this._rainGfx = this.add.graphics();
-    for (let i = 0; i < 35; i++) {
+    for (let i = 0; i < (effectsEnabled() ? 35 : 10); i++) {
       this._rainDrops.push({
         x: Math.random() * width,
         y: Math.random() * height,
