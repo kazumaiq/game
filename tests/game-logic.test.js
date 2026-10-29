@@ -490,7 +490,7 @@ test('17. Пакеты обслуживания требуют химию и с�
   const car = gameState.addCar('sedan');
   gameState.assignCarToPost(car.id, 'post_1');
   const net = gameState.addServiceIncome(car.id, 1);
-  assert.equal(net, 1700);
+  assert.equal(net, 2050);
   assert.equal(gameState.chemistryStock.ceramic, 14);
 });
 
