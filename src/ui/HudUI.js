@@ -10,6 +10,7 @@ import { showDailyContractsPanel } from './DailyContractsUI.js';
 import { showToast } from './ToastUI.js';
 import { audioManager } from '../game/systems/AudioManager.js';
 import { getShiftClock } from '../game/systems/DayCycle.js';
+import { showBusinessManagementPanel } from './BusinessManagementUI.js';
 
 let _hudElement = null;
 let _scene = null;
@@ -62,6 +63,7 @@ export function createHUD(scene) {
         <button class="hud-btn" id="hud-btn-upgrades">
           <span>⚡</span> Улучшения
         </button>
+        <button class="hud-btn" id="hud-btn-management"><span>🏗️</span> Развитие</button>
         <button class="hud-btn" id="hud-btn-contracts">
           <span>🎯</span> Цели
         </button>
@@ -92,6 +94,10 @@ export function createHUD(scene) {
   document.getElementById('hud-btn-upgrades').addEventListener('click', () => {
     audioManager.play('buttonClick');
     showUpgradePanel();
+  });
+  document.getElementById('hud-btn-management').addEventListener('click', () => {
+    audioManager.play('buttonClick');
+    showBusinessManagementPanel();
   });
   document.getElementById('hud-btn-contracts').addEventListener('click', () => {
     audioManager.play('buttonClick');

@@ -56,6 +56,7 @@ export default class CarWashScene extends Phaser.Scene {
     this._walkFrame = 0;
     this._dayCycleUpdateTimer = 0;
     this._createDayCycleEffects();
+    this._createWeatherEffects();
 
     // Графический маркер подсветки целевой машины во время обучения
     this._targetHighlight = this.add.graphics();
@@ -165,6 +166,41 @@ export default class CarWashScene extends Phaser.Scene {
 
     this.physics.world.setBounds(20, 170, WORLD.width - 40, WORLD.height - 210);
     this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
+  }
+
+  _createWeatherEffects() {
+    this._weatherGfx = this.add.graphics().setDepth(21);
+    this._weatherUpdateTimer = 0;
+    this._weatherParticles = Array.from({ length: 42 }, () => ({
+      x: Phaser.Math.Between(0, WORLD.width),
+      y: Phaser.Math.Between(0, WORLD.height),
+      speed: Phaser.Math.Between(160, 300),
+      size: Phaser.Math.Between(2, 5),
+    }));
+    this._updateWeatherEffects(0);
+  }
+
+  _updateWeatherEffects(delta = 0) {
+    if (!this._weatherGfx || !this._weatherParticles) return;
+    const weather = gameState.weather || 'clear';
+    const gfx = this._weatherGfx;
+    gfx.clear();
+    if (weather === 'clear') return;
+
+    const isSnow = weather === 'snow';
+    gfx.lineStyle(isSnow ? 1 : 1.2, isSnow ? 0xe6f4ff : 0x9edfff, isSnow ? 0.62 : 0.38);
+    gfx.fillStyle(0xeaf7ff, 0.7);
+    for (const particle of this._weatherParticles) {
+      particle.y += particle.speed * (delta / 1000);
+      particle.x += isSnow ? Math.sin(particle.y / 24) * 0.35 : -2.5;
+      if (particle.y > WORLD.height + 12) {
+        particle.y = -10;
+        particle.x = Phaser.Math.Between(0, WORLD.width);
+      }
+      if (particle.x < -10) particle.x = WORLD.width + 8;
+      if (isSnow) gfx.fillCircle(particle.x, particle.y, particle.size * 0.45);
+      else gfx.lineBetween(particle.x, particle.y, particle.x - 4, particle.y + 11);
+    }
   }
 
   _createDayCycleEffects() {
@@ -1329,6 +1365,12 @@ export default class CarWashScene extends Phaser.Scene {
 
     this._shiftTimer += delta;
     gameState.shiftTimeRemaining = Math.max(0, BALANCE.time.shiftDurationMs - this._shiftTimer);
+    this._weatherUpdateTimer += delta;
+    if (this._weatherUpdateTimer >= 60) {
+      this._weatherUpdateTimer = 0;
+      this._updateWeatherEffects(delta);
+    }
+
     this._dayCycleUpdateTimer += delta;
     if (this._dayCycleUpdateTimer >= 100) {
       this._dayCycleUpdateTimer = 0;

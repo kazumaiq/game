@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS public.saves (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL UNIQUE,
     save_data JSONB NOT NULL,
-    save_version INTEGER NOT NULL DEFAULT 5,
+    save_version INTEGER NOT NULL DEFAULT 6,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
