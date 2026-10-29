@@ -99,6 +99,13 @@ export default class CarWashScene extends Phaser.Scene {
       if (this.player) this._spawnCleanSparkles(this.player.x, this.player.y - 20);
     };
     gameState.on('achievementUnlocked', this._onAchievementUnlocked);
+    this._onPerfectStreakBonus = ({ streak, bonus, carId }) => {
+      audioManager.play('success');
+      showToast(`🔥 Серия идеальных моек ×${streak}! +${this._formatMoney(bonus)}`, 'success');
+      const carSprite = this._carSprites[carId];
+      if (carSprite && carSprite.active) this._spawnCleanSparkles(carSprite.x, carSprite.y - 12);
+    };
+    gameState.on('perfectStreakBonus', this._onPerfectStreakBonus);
 
     this.scale.on('resize', this._handleResize, this);
     this._handleResize({ width: this.scale.width, height: this.scale.height });
@@ -2151,6 +2158,7 @@ export default class CarWashScene extends Phaser.Scene {
     saveSystem.stopAutoSave();
     gameState.off('stateChanged', this._onStateChanged);
     gameState.off('achievementUnlocked', this._onAchievementUnlocked);
+    gameState.off('perfectStreakBonus', this._onPerfectStreakBonus);
     destroyHUD();
     hideWashProgress();
 
