@@ -3156,3 +3156,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .upgrade-effect { color:#91a9c1; font-size:10px; line-height:1.4; margin-top:5px; }
 .upgrade-effect strong { color:#58e1e8; font-weight:800; }
 @media (max-width:460px) { .upgrade-effect { font-size:9px; } }
+
+.daily-contracts-bonus { display:flex; align-items:center; gap:10px; margin-top:12px; padding:13px; border:1px solid rgba(168,85,247,.3); border-radius:15px; background:linear-gradient(120deg,rgba(76,29,149,.2),rgba(15,23,42,.72)); }
+.daily-contracts-bonus-icon { display:grid; place-items:center; flex:0 0 34px; height:34px; border-radius:11px; background:rgba(168,85,247,.14); color:#d8b4fe; font-size:20px; }
+.daily-contracts-bonus > div { flex:1; min-width:0; }
+.daily-contracts-bonus > div strong { color:#f3e8ff; font-size:12px; }
+.daily-contracts-bonus p { margin:4px 0 0; color:#a8b6ca; font-size:10px; line-height:1.4; }
+.daily-contracts-bonus-value { color:#d8b4fe; font-size:12px; white-space:nowrap; }
+.daily-contracts-bonus.is-unlocked { border-color:rgba(52,211,153,.45); background:linear-gradient(120deg,rgba(6,78,59,.28),rgba(15,23,42,.72)); }
+.daily-contracts-bonus.is-unlocked .daily-contracts-bonus-icon,.daily-contracts-bonus.is-unlocked .daily-contracts-bonus-value { color:#6ee7b7; }
+@media (max-width:460px) { .daily-contracts-bonus { gap:7px; padding:10px; } .daily-contracts-bonus-icon { flex-basis:28px; height:28px; } .daily-contracts-bonus > div strong { font-size:11px; } .daily-contracts-bonus-value { font-size:10px; } }
