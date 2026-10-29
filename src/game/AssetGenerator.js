@@ -692,11 +692,29 @@ function _generateCar(g, key, conf, state) {
     g.fillStyle(0xef4444);
     g.fillRect(wp.x - 2, wp.y + 3, 4, wheelH - 6);
 
-    // Литой легкосплавный диск с лучами
-    g.fillStyle(0x94a3b8);
-    g.fillRoundedRect(wp.x - wheelW / 2 + 3, wp.y + 2, wheelW - 6, wheelH - 4, 2);
+    // Литой легкосплавный диск с металлической кромкой и тонкими спицами.
+    const rimX = wp.x - wheelW / 2 + 3;
+    const rimY = wp.y + 2;
+    const rimW = Math.max(3, wheelW - 6);
+    const rimH = Math.max(3, wheelH - 4);
+    const rimCenterY = wp.y + wheelH / 2;
+    g.fillStyle(0x64748b);
+    g.fillRoundedRect(rimX - 1, rimY - 1, rimW + 2, rimH + 2, 2);
+    g.fillStyle(0xcbd5e1);
+    g.fillRoundedRect(rimX, rimY, rimW, rimH, 2);
+    g.fillStyle(0x334155);
+    g.fillRoundedRect(rimX + 1, rimY + 1, Math.max(1, rimW - 2), Math.max(1, rimH - 2), 1);
+    // Spokes catch a narrow highlight instead of reading as a flat silver block.
+    g.lineStyle(1, 0xe2e8f0, 0.92);
+    g.lineBetween(wp.x, rimCenterY - rimH * 0.34, wp.x, rimCenterY + rimH * 0.34);
+    g.lineBetween(wp.x - rimW * 0.3, rimCenterY, wp.x + rimW * 0.3, rimCenterY);
+    g.lineStyle(1, 0x94a3b8, 0.85);
+    g.lineBetween(wp.x - rimW * 0.23, rimCenterY - rimH * 0.24, wp.x + rimW * 0.23, rimCenterY + rimH * 0.24);
+    g.lineBetween(wp.x - rimW * 0.23, rimCenterY + rimH * 0.24, wp.x + rimW * 0.23, rimCenterY - rimH * 0.24);
     g.fillStyle(0x0f172a);
-    g.fillCircle(wp.x, wp.y + wheelH / 2, 2.5); // ступица
+    g.fillCircle(wp.x, rimCenterY, 2.5); // ступица
+    g.fillStyle(0xe2e8f0, 0.95);
+    g.fillCircle(wp.x - 0.6, rimCenterY - 0.6, 0.8);
   }
 
   // 3. Цвет кузова с учетом состояния (грязь приглушает базовый цвет)
@@ -930,6 +948,17 @@ function _generateCar(g, key, conf, state) {
     g.fillRoundedRect(W * 0.48, H * 0.2, W * 0.18, 1.5, 1);
     g.fillStyle(conf.accentColor, 0.16);
     g.fillEllipse(W * 0.65, H * 0.72, W * 0.22, 4);
+  }
+
+  // Final clear-coat pass: controlled reflections make the car read as a solid,
+  // glossy object without relying on expensive real-time shaders.
+  if (state !== 'dirty' && state !== 'foam') {
+    g.fillStyle(0xffffff, state === 'clean' ? 0.2 : 0.1);
+    g.fillRoundedRect(W * 0.18, H * 0.12, W * 0.26, 1.2, 1);
+    g.fillStyle(0x7dd3fc, state === 'clean' ? 0.17 : 0.08);
+    g.fillRoundedRect(W * 0.12, H * 0.78, W * 0.3, 1.2, 1);
+    g.lineStyle(1, 0xe0f2fe, state === 'clean' ? 0.48 : 0.2);
+    g.lineBetween(cabX + 3, cabY + cabH - 3, cabX + cabW - 3, cabY + cabH - 3);
   }
 
   g.generateTexture(key, W * 2, H * 2);

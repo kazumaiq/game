@@ -58,7 +58,7 @@ test('4. Добавление машины, расход материалов и
 
   const net = gameState.addServiceIncome(car.id, 1.0);
   assert.equal(net, 400);
-  assert.equal(gameState.money, startMoney + 400);
+  assert.equal(gameState.money, startMoney + 400 + 2500); // net from wash + one-time first-wash achievement
   assert.equal(car.paid, true);
   assert.equal(car.completed, true);
   assert.equal(gameState.stats.todayCarsWashed, 1);
@@ -230,7 +230,7 @@ test('13. Шаг 4 завершается после начисления опл
   const moneyBefore = gameState.money;
   const net = gameState.addServiceIncome(car.id, 1.0);
   assert.ok(net > 0);
-  assert.equal(gameState.money, moneyBefore + net);
+  assert.equal(gameState.money, moneyBefore + net + 2500); // first-wash career reward
 
   // Завершение обучения переводит флаг
   gameState.completeTutorial();
@@ -240,7 +240,7 @@ test('13. Шаг 4 завершается после начисления опл
   // Повторная попытка завершить заказ не начисляет деньги
   const secondIncome = gameState.addServiceIncome(car.id, 1.0);
   assert.equal(secondIncome, 0);
-  assert.equal(gameState.money, moneyBefore + net);
+  assert.equal(gameState.money, moneyBefore + net + 2500);
 });
 
 test('14. Отсутствие целевой машины восстанавливается', () => {
@@ -452,6 +452,71 @@ test('23. Часы смены плавно проходят утро, день �
   assert.equal(evening.clock, '20:00');
   assert.equal(evening.phase, 'evening');
   assert.equal(getShiftClock(-500, cfg).clock, '20:00');
+});
+
+test('25. Карьерные достижения выплачиваются один раз и сохраняются', () => {
+  gameState.initNewGame('roadside');
+  const first = gameState.addCar('sedan');
+  assert.ok(first);
+  assert.equal(gameState.assignCarToPost(first.id, 'post_1'), true);
+  const beforeFirstWash = gameState.money;
+  const net = gameState.addServiceIncome(first.id, 0.75);
+  assert.equal(net, 400);
+  assert.equal(gameState.money, beforeFirstWash + net + 2500);
+  assert.equal(gameState.achievements.first_wash, true);
+  assert.ok(gameState.getCareerAchievements().find(item => item.id === 'first_wash').unlocked);
+
+  const snapshot = gameState.serialize();
+  gameState.reset();
+  assert.equal(gameState.deserialize(snapshot), true);
+  assert.equal(gameState.achievements.first_wash, true);
+  const beforeSecondWash = gameState.money;
+  const second = gameState.addCar('compact');
+  assert.ok(second);
+  assert.equal(gameState.assignCarToPost(second.id, 'post_1'), true);
+  gameState.addServiceIncome(second.id, 0.75);
+  assert.equal(gameState.money, beforeSecondWash + 370);
+});
+
+test('26. Открытие третьего бокса меняет состояние и платит достижение', () => {
+  gameState.initNewGame('roadside');
+  const result = gameState.unlockPost('post_3');
+  assert.equal(result.success, true);
+  assert.equal(gameState.posts.find(post => post.id === 'post_3').unlocked, true);
+  assert.equal(gameState.achievements.third_bay, true);
+  assert.equal(gameState.money, 600000 - 450000 + 15000);
+  const snapshot = gameState.serialize();
+  gameState.reset();
+  assert.equal(gameState.deserialize(snapshot), true);
+  assert.equal(gameState.posts.find(post => post.id === 'post_3').unlocked, true);
+  assert.equal(gameState.achievements.third_bay, true);
+});
+
+test('27. Серия идеальных моек начисляет бонус и сохраняет рекорд', () => {
+  gameState.initNewGame('roadside');
+  const moneyBefore = gameState.money;
+  for (let i = 0; i < 3; i++) {
+    const car = gameState.addCar('sedan');
+    assert.ok(car);
+    assert.equal(gameState.assignCarToPost(car.id, 'post_1'), true);
+    gameState.addServiceIncome(car.id, 0.9);
+    gameState.removeCar(car.id);
+  }
+  assert.equal(gameState.perfectWashStreak, 3);
+  assert.equal(gameState.bestPerfectWashStreak, 3);
+  assert.equal(gameState.achievements.perfect_streak_3, true);
+  assert.equal(gameState.money, moneyBefore + 11700);
+  const snapshot = gameState.serialize();
+  gameState.reset();
+  assert.equal(gameState.deserialize(snapshot), true);
+  assert.equal(gameState.perfectWashStreak, 3);
+  assert.equal(gameState.bestPerfectWashStreak, 3);
+  const bad = gameState.addCar('sedan');
+  assert.ok(bad);
+  gameState.assignCarToPost(bad.id, 'post_1');
+  gameState.addServiceIncome(bad.id, 0.6);
+  assert.equal(gameState.perfectWashStreak, 0);
+  assert.equal(gameState.bestPerfectWashStreak, 3);
 });
 
 test('24. Суточный цикл усиливает освещение постов к вечеру', () => {

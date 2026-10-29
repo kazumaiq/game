@@ -22,6 +22,8 @@ const WORLD = {
   posts: [
     { x: 300, y: 310, label: 'Бокс 1' },
     { x: 600, y: 310, label: 'Бокс 2' },
+    { x: 130, y: 402, label: 'Бокс 3', expansion: true },
+    { x: 770, y: 402, label: 'Бокс 4', expansion: true },
   ],
   queueStart: { x: 130, y: 490 },
   queueSpacing: 70,
@@ -47,6 +49,7 @@ export default class CarWashScene extends Phaser.Scene {
     this._carSprites = {};
     this._washingCar = null;
     this._isWashing = false;
+    this._coffeeRushUntil = 0;
 
     this._spawnTimer = 0;
     this._shiftTimer = 0;
@@ -65,6 +68,11 @@ export default class CarWashScene extends Phaser.Scene {
     this._sprayGfx = this.add.graphics();
     this._sprayGfx.setDepth(22);
 
+    // One shared lightweight canvas layer tracks waiting-customer patience without
+    // creating dozens of per-car DOM elements or particle emitters.
+    this._queueMoodGfx = this.add.graphics().setDepth(20.4);
+    this._queueMoodUpdateTimer = 0;
+
     this._storySystem = new StorySystem();
     this._tutorialSystem = tutorialSystem;
 
@@ -80,8 +88,24 @@ export default class CarWashScene extends Phaser.Scene {
       this._tutorialSystem.start(this);
     }
 
-    this._onStateChanged = () => updateHUD();
+    this._onStateChanged = () => {
+      updateHUD();
+      this._updateUpgradeVisuals();
+    };
     gameState.on('stateChanged', this._onStateChanged);
+    this._onAchievementUnlocked = (achievement) => {
+      audioManager.play('success');
+      showToast(`🏆 ${achievement.title} · +${this._formatMoney(achievement.reward)}`, 'success');
+      if (this.player) this._spawnCleanSparkles(this.player.x, this.player.y - 20);
+    };
+    gameState.on('achievementUnlocked', this._onAchievementUnlocked);
+    this._onPerfectStreakBonus = ({ streak, bonus, carId }) => {
+      audioManager.play('success');
+      showToast(`🔥 Серия идеальных моек ×${streak}! +${this._formatMoney(bonus)}`, 'success');
+      const carSprite = this._carSprites[carId];
+      if (carSprite && carSprite.active) this._spawnCleanSparkles(carSprite.x, carSprite.y - 12);
+    };
+    gameState.on('perfectStreakBonus', this._onPerfectStreakBonus);
 
     this.scale.on('resize', this._handleResize, this);
     this._handleResize({ width: this.scale.width, height: this.scale.height });
@@ -98,28 +122,29 @@ export default class CarWashScene extends Phaser.Scene {
   }
 
   _handleResize(gameSize) {
-    const width = gameSize.width;
-    const height = gameSize.height;
-
+    const width = Math.max(1, gameSize.width);
+    const height = Math.max(1, gameSize.height);
     const minDim = Math.min(width, height);
     const portraitPhone = width < 460 && height > width;
-    let targetZoom = 1.15;
-    if (portraitPhone) {
-      // На узком телефоне показываем оба бокса целиком, а не обрезаем подписи по краям.
-      targetZoom = 0.68;
-    } else if (minDim < 420) {
-      targetZoom = 0.9;
-    } else if (minDim < 650) {
-      targetZoom = 1.05;
-    }
 
-    this.cameras.main.setZoom(targetZoom);
-    this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
+    // Keep the established, readable camera scale. The previous 0.68 zoom on
+    // portrait phones made the yard tiny and pushed the player visually away.
+    // Slightly wider view shows more of the yard without making the player tiny.
+    let targetZoom = 1.08;
+    if (minDim < 360) targetZoom = 0.92;
+    else if (minDim < 420) targetZoom = 0.96;
+    else if (minDim < 650) targetZoom = 1.0;
 
-    // Компенсируем уменьшение камеры, чтобы персонаж оставался заметным на портретном экране.
-    if (this.player) {
-      this.player.setScale(portraitPhone ? 0.675 : 0.5);
-    }
+    const cam = this.cameras.main;
+    cam.setZoom(targetZoom);
+    cam.setBounds(0, 0, WORLD.width, WORLD.height);
+
+    // Keep character scale stable; don't enlarge the sprite just because the
+    // viewport is portrait. The camera tracks the player after the tutorial.
+    if (this.player) this.player.setScale(0.5);
+
+    // Recompute the active camera target after viewport/orientation changes.
+    if (this.player) this._updateCameraTracking(true);
   }
 
   _createEnvironment() {
@@ -132,6 +157,7 @@ export default class CarWashScene extends Phaser.Scene {
     this._building = this.add.image(WORLD.building.x, WORLD.building.y, 'wash-building-art')
       .setDisplaySize(560, 194)
       .setDepth(5);
+    this._createOfficeEntrance();
 
     this._postSprites = [];
     this._postStatusLabels = [];
@@ -139,21 +165,25 @@ export default class CarWashScene extends Phaser.Scene {
       const pos = WORLD.posts[i];
       const postData = gameState.posts[i];
       const texture = postData.broken ? 'wash-bay-broken-art' : 'wash-bay-art';
+      const compactExpansion = !!pos.expansion;
       const sprite = this.add.image(pos.x, pos.y, texture)
-        .setDisplaySize(300, 192)
+        .setDisplaySize(compactExpansion ? 176 : 300, compactExpansion ? 112 : 192)
         .setDepth(6);
+      if (postData.unlocked === false) sprite.setAlpha(0.16);
 
-      const label = this.add.text(pos.x, pos.y - 112, `${pos.label} • СВОБОДЕН`, {
-        fontSize: '16px',
+      const label = this.add.text(pos.x, pos.y - (compactExpansion ? 76 : 112),
+        postData.unlocked === false ? `${pos.label.toUpperCase()} · ЗАКРЫТ` : `${pos.label.toUpperCase()} · ГОТОВ`, {
+        fontSize: compactExpansion ? '9px' : '11px',
         color: '#8df4ff',
         backgroundColor: 'rgba(5, 12, 24, 0.98)',
-        padding: { x: 12, y: 7 },
+        padding: compactExpansion ? { x: 6, y: 4 } : { x: 8, y: 4 },
         fontFamily: 'Arial, Helvetica, sans-serif',
         fontStyle: 'bold',
         stroke: '#07111f',
         strokeThickness: 3,
         shadow: { offsetX: 0, offsetY: 2, color: '#000000', blur: 4, fill: true },
       }).setOrigin(0.5).setDepth(8);
+      if (postData.unlocked === false) label.setColor('#94a3b8');
 
       this._postSprites.push(sprite);
       this._postStatusLabels.push(label);
@@ -162,14 +192,270 @@ export default class CarWashScene extends Phaser.Scene {
     this._createGroundMarkings();
     this._createAmbientLighting();
     this._createScenery();
+    this._createCityDetails();
+    this._createUpgradeVisuals();
 
     this.physics.world.setBounds(20, 170, WORLD.width - 40, WORLD.height - 210);
     this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
   }
 
+
+  /**
+   * Visual feedback for purchased upgrades, using lightweight graphics only.
+   * No gameplay values are changed here; GameState remains the source of truth.
+   */
+  _createUpgradeVisuals() {
+    this._upgradeVisuals = this.add.graphics().setDepth(7.6);
+    this._updateUpgradeVisuals();
+  }
+
+  _updateUpgradeVisuals() {
+    if (!this._upgradeVisuals) return;
+    const g = this._upgradeVisuals;
+    g.clear();
+
+    const levels = [
+      Math.min(3, gameState.upgrades.washSpeed || 0),
+      Math.min(3, gameState.upgrades.equipmentQuality || 0),
+      Math.min(3, gameState.upgrades.reliability || 0),
+    ];
+    const colors = [0x38bdf8, 0xfbbf24, 0x4ade80];
+
+    // Tiny status lamps on each bay's fascia make equipment upgrades visible in-world.
+    for (const pos of WORLD.posts) {
+      g.fillStyle(0x07111d, 0.9);
+      g.fillRoundedRect(pos.x - 39, pos.y - 82, 78, 13, 3);
+      g.lineStyle(1, 0x64748b, 0.58);
+      g.strokeRoundedRect(pos.x - 39, pos.y - 82, 78, 13, 3);
+      let offset = pos.x - 29;
+      for (let group = 0; group < levels.length; group++) {
+        for (let led = 0; led < 3; led++) {
+          const active = led < levels[group];
+          g.fillStyle(colors[group], active ? 0.95 : 0.15);
+          g.fillRoundedRect(offset + led * 7, pos.y - 78, 4, 5, 1);
+          if (active) {
+            g.fillStyle(colors[group], 0.12);
+            g.fillCircle(offset + led * 7 + 2, pos.y - 75.5, 5);
+          }
+        }
+        offset += 22;
+      }
+    }
+
+    // Capacity upgrade is represented by additional illuminated queue markers.
+    const capacityLevel = Math.min(3, gameState.upgrades.capacity || 0);
+    for (let i = 0; i < 3; i++) {
+      g.fillStyle(i < capacityLevel ? 0x4ade80 : 0x64748b, i < capacityLevel ? 0.8 : 0.22);
+      g.fillRoundedRect(100 + i * 13, 462, 8, 3, 1);
+    }
+  }
+
+  /**
+   * A clear, lightweight office entrance layered onto the existing building art.
+   * It is decorative only; business state remains managed by the existing UI.
+   */
+  _createOfficeEntrance() {
+    const g = this.add.graphics().setDepth(5.35);
+
+    // Recessed doorway, glass panels and a warm interior light.
+    g.fillStyle(0x050b15, 0.92);
+    g.fillRoundedRect(419, 135, 62, 57, 4);
+    g.lineStyle(2, 0x7dd3fc, 0.8);
+    g.strokeRoundedRect(419, 135, 62, 57, 4);
+    g.fillStyle(0x18364a, 0.98);
+    g.fillRoundedRect(424, 140, 52, 47, 2);
+    g.fillStyle(0xffd28a, 0.18);
+    g.fillRoundedRect(427, 143, 46, 41, 2);
+    g.lineStyle(1, 0x9eeeff, 0.55);
+    g.lineBetween(450, 141, 450, 186);
+    g.fillStyle(0xffd28a, 0.85);
+    g.fillCircle(468, 164, 2);
+
+    // Steps and a restrained cyan edge light.
+    g.fillStyle(0x172638, 1);
+    g.fillRoundedRect(412, 188, 76, 6, 2);
+    g.fillStyle(0x7dd3fc, 0.78);
+    g.fillRoundedRect(418, 188, 64, 1.5, 1);
+
+    // Compact readable office sign.
+    g.fillStyle(0x07111d, 0.96);
+    g.fillRoundedRect(409, 113, 82, 17, 3);
+    g.lineStyle(1, 0x38bdf8, 0.78);
+    g.strokeRoundedRect(409, 113, 82, 17, 3);
+    this.add.text(450, 121.5, 'УПРАВЛЕНИЕ', {
+      fontFamily: 'Arial, Helvetica, sans-serif',
+      fontSize: '8px',
+      fontStyle: 'bold',
+      color: '#e6faff',
+      letterSpacing: 1,
+    }).setOrigin(0.5).setDepth(5.45);
+
+    // A subtle ground marker makes the interaction point easy to find.
+    const marker = this.add.ellipse(450, 198, 46, 12, 0x38bdf8, 0.12).setDepth(5.1);
+    this.tweens.add({
+      targets: marker,
+      alpha: { from: 0.12, to: 0.32 },
+      scaleX: { from: 0.9, to: 1.12 },
+      duration: 1100,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.inOut',
+    });
+  }
+
+  /**
+   * Static city dressing around the playable yard.
+   * Kept as lightweight Phaser Graphics + existing generated car textures:
+   * no extra library, no new save data, and no changes to collision/gameplay.
+   */
+  _createCityDetails() {
+    const architecture = this.add.graphics().setDepth(1.4);
+    const drawFacade = (x, y, width, height, accent, title, subtitle) => {
+      // Ground shadow and raised curb make the facade sit in the scene.
+      architecture.fillStyle(0x030711, 0.32);
+      architecture.fillEllipse(x + width / 2 + 3, y + height + 8, width + 22, 16);
+      architecture.fillStyle(0x5d7180, 0.9);
+      architecture.fillRoundedRect(x - 5, y + height - 2, width + 10, 9, 2);
+      architecture.fillStyle(0x111a29, 0.98);
+      architecture.fillRoundedRect(x, y, width, height, 5);
+      architecture.fillStyle(0x26384a, 0.96);
+      architecture.fillRoundedRect(x + 4, y + 4, width - 8, height - 8, 3);
+      architecture.fillStyle(0x0b1422, 0.95);
+      architecture.fillRoundedRect(x + 8, y + 10, width - 16, height - 27, 2);
+      // Warm interior glass with cool vertical mullions.
+      architecture.fillStyle(0x9ac5c8, 0.28);
+      architecture.fillRect(x + 11, y + 13, width - 22, height - 34);
+      architecture.fillStyle(0xffd28a, 0.23);
+      architecture.fillRect(x + 14, y + 16, width - 28, height - 40);
+      architecture.lineStyle(2, 0x0d1b2a, 0.9);
+      architecture.strokeLineShape(new Phaser.Geom.Line(x + width * 0.36, y + 12, x + width * 0.36, y + height - 20));
+      architecture.strokeLineShape(new Phaser.Geom.Line(x + width * 0.65, y + 12, x + width * 0.65, y + height - 20));
+      // Canopy and thin illuminated trim.
+      architecture.fillStyle(0x172638, 1);
+      architecture.fillRoundedRect(x - 4, y + 5, width + 8, 8, 2);
+      architecture.fillStyle(accent, 0.88);
+      architecture.fillRoundedRect(x + 8, y + 7, width - 16, 2, 1);
+      architecture.fillStyle(0x0b1420, 0.98);
+      architecture.fillRoundedRect(x + 9, y + height - 21, width - 18, 14, 3);
+      architecture.lineStyle(1, accent, 0.7);
+      architecture.strokeRoundedRect(x + 9, y + height - 21, width - 18, 14, 3);
+      this.add.text(x + width / 2, y + height - 14, title, {
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontSize: '7px',
+        fontStyle: 'bold',
+        color: '#eaf7ff',
+        stroke: '#07111b',
+        strokeThickness: 2,
+        align: 'center',
+      }).setOrigin(0.5).setDepth(2.1);
+      this.add.text(x + width / 2, y + height + 15, subtitle, {
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontSize: '7px',
+        fontStyle: 'bold',
+        color: '#9bb1c4',
+        stroke: '#0b111b',
+        strokeThickness: 2,
+        align: 'center',
+      }).setOrigin(0.5).setDepth(2.1);
+    };
+
+    // Small neighbouring businesses frame the car wash without covering either bay.
+    drawFacade(28, 188, 112, 72, 0x4bd5e5, 'CITY AUTO', 'ЗАПЧАСТИ');
+    drawFacade(760, 188, 112, 72, 0xffb86b, 'COFFEE STOP', 'КОФЕ · ОЖИДАНИЕ');
+
+    // Steam drifting from the cafe makes the neighbouring business feel alive.
+    this._coffeeSteam = [];
+    for (let i = 0; i < 3; i++) {
+      const steam = this.add.circle(806 + i * 9, 202 + (i % 2) * 3, 2.2, 0xffe4bd, 0.45)
+        .setDepth(3.2 + i * 0.001);
+      this._coffeeSteam.push(steam);
+      this.tweens.add({
+        targets: steam,
+        y: steam.y - 13 - i * 2,
+        x: steam.x + (i % 2 ? 4 : -3),
+        alpha: 0,
+        scale: 1.7,
+        duration: 1800 + i * 260,
+        delay: i * 420,
+        repeat: -1,
+        onRepeat: () => {
+          if (steam.active) { steam.setPosition(806 + i * 9, 202 + (i % 2) * 3); steam.setAlpha(0.45); steam.setScale(1); }
+        },
+      });
+    }
+
+    // Marked customer parking pockets at the far edges of the lot.
+    const parking = this.add.graphics().setDepth(2.55);
+    for (const side of [{ x: 63, y: 322 }, { x: 737, y: 322 }]) {
+      parking.fillStyle(0x050912, 0.22);
+      parking.fillRoundedRect(side.x - 8, side.y - 22, 108, 62, 5);
+      parking.lineStyle(1.5, 0xd8e5ed, 0.48);
+      parking.strokeLineShape(new Phaser.Geom.Line(side.x, side.y - 19, side.x, side.y + 31));
+      parking.strokeLineShape(new Phaser.Geom.Line(side.x + 45, side.y - 19, side.x + 45, side.y + 31));
+      parking.strokeLineShape(new Phaser.Geom.Line(side.x + 90, side.y - 19, side.x + 90, side.y + 31));
+      parking.lineStyle(2, 0x38bdf8, 0.24);
+      parking.strokeLineShape(new Phaser.Geom.Line(side.x - 5, side.y + 35, side.x + 95, side.y + 35));
+    }
+
+    // Parked cars use the same high-resolution generated textures as customer cars.
+    // Their low depth keeps live cars, workers and effects fully interactive in front.
+    const parkedCars = [
+      { x: 86, y: 335, key: 'car_suv', scale: 0.27, tint: 0x8da7c5 },
+      { x: 782, y: 335, key: 'car_premium', scale: 0.27, tint: 0xd5c4a0 },
+    ];
+    for (const car of parkedCars) {
+      const shadow = this.add.ellipse(car.x + 2, car.y + 8, 43, 20, 0x02050a, 0.42).setDepth(2.7);
+      const sprite = this.add.image(car.x, car.y, car.key)
+        .setScale(car.scale)
+        .setTint(car.tint)
+        .setDepth(2.85);
+      // A tiny windshield glint helps the miniature vehicles read as glossy objects.
+      const glint = this.add.graphics().setDepth(2.9);
+      glint.lineStyle(1, 0xe6f7ff, 0.55);
+      glint.lineBetween(car.x - 5, car.y - 4, car.x + 3, car.y - 6);
+      sprite.setData('cityParkingCar', true);
+      shadow.setData('cityParkingShadow', true);
+    }
+
+    // Directional signs and reflective bollards add legibility at the entrance/exit.
+    const signs = this.add.graphics().setDepth(4.2);
+    for (const sign of [
+      { x: 22, y: 432, color: 0x38bdf8, label: 'IN' },
+      { x: 878, y: 432, color: 0x4ade80, label: 'OUT' },
+    ]) {
+      signs.fillStyle(0x050b14, 0.35);
+      signs.fillEllipse(sign.x, sign.y + 18, 17, 6);
+      signs.fillStyle(0x263647, 1);
+      signs.fillRoundedRect(sign.x - 2, sign.y - 2, 4, 22, 1);
+      signs.fillStyle(sign.color, 0.9);
+      signs.fillRoundedRect(sign.x - 13, sign.y - 11, 26, 14, 3);
+      signs.lineStyle(1, 0xeaf8ff, 0.45);
+      signs.strokeRoundedRect(sign.x - 13, sign.y - 11, 26, 14, 3);
+      this.add.text(sign.x, sign.y - 4, sign.label, {
+        fontFamily: 'Arial, Helvetica, sans-serif',
+        fontSize: '7px',
+        fontStyle: 'bold',
+        color: '#06111c',
+      }).setOrigin(0.5).setDepth(4.3);
+    }
+
+    // Small pavement studs: deliberately sparse so they read as guidance, not noise.
+    const studs = this.add.graphics().setDepth(3.3);
+    for (let i = 0; i < 9; i++) {
+      const x = 195 + i * 64;
+      studs.fillStyle(i % 3 === 0 ? 0xffbd73 : 0x82eaff, i % 3 === 0 ? 0.52 : 0.28);
+      studs.fillRoundedRect(x, 535, 8, 2, 1);
+      studs.fillStyle(0xe6f8ff, 0.12);
+      studs.fillRoundedRect(x + 12, 541, 14, 1, 0);
+    }
+  }
+
   _createDayCycleEffects() {
     // A subtle full-world color grade makes the passage of the shift visible
     // without changing the artwork itself. Practical lights glow brighter at dusk.
+    this._dayAtmosphere = this.add.rectangle(WORLD.width / 2, WORLD.height / 2, WORLD.width, WORLD.height, 0xffd19a, 0)
+      .setDepth(22.7)
+      .setBlendMode(Phaser.BlendModes.NORMAL);
     this._dayTint = this.add.rectangle(WORLD.width / 2, WORLD.height / 2, WORLD.width, WORLD.height, 0xffffff, 0)
       .setDepth(23)
       .setBlendMode(Phaser.BlendModes.MULTIPLY);
@@ -184,11 +470,23 @@ export default class CarWashScene extends Phaser.Scene {
     const clock = getShiftClock(gameState.shiftTimeRemaining, BALANCE.time);
     const profile = getDayCycleProfile(clock.hour);
     this._dayTint.setFillStyle(profile.tintColor, profile.tintAlpha);
+    const atmosphereAlpha = clock.hour < 9 ? 0.13 : clock.hour < 10 ? 0.075 : clock.hour >= 19 ? 0.045 : clock.hour >= 17.5 ? 0.055 : 0.018;
+    this._dayAtmosphere.setFillStyle(profile.tintColor, atmosphereAlpha);
     this.cameras.main.setBackgroundColor(profile.tintColor);
 
     const lights = this._dayLights;
     lights.clear();
     const intensity = profile.lampAlpha;
+    // Warm low-angle sunlight makes morning read as morning, not as a dark night map.
+    if (clock.hour < 10.5) {
+      const morningStrength = clock.hour < 9 ? 0.12 : 0.065;
+      lights.fillStyle(0xffb85e, morningStrength * 0.28);
+      lights.fillCircle(450, 115, 230);
+      lights.fillStyle(0xffd18a, morningStrength * 0.34);
+      lights.fillEllipse(450, 320, 570, 250);
+      lights.fillStyle(0xffe0a3, morningStrength * 0.18);
+      for (const pos of WORLD.posts.slice(0, 2)) lights.fillEllipse(pos.x, pos.y + 18, 115, 48);
+    }
     if (intensity > 0.005) {
       // Concentric additive halos imitate warm lamps reflecting on wet concrete.
       for (const pos of WORLD.posts) {
@@ -338,6 +636,48 @@ export default class CarWashScene extends Phaser.Scene {
     light.fillEllipse(WORLD.entrance.x + 55, WORLD.entrance.y - 35, 78, 38);
     light.fillStyle(0x22c55e, 0.035);
     light.fillEllipse(WORLD.exit.x - 40, WORLD.exit.y - 35, 82, 34);
+
+    // Wet-ground specular streaks: clustered by light source, with darker
+    // gaps between them so the concrete reads glossy rather than uniformly blue.
+    const puddleGroups = [
+      { x: WORLD.posts[0].x, y: WORLD.posts[0].y + 82, color: 0x38bdf8 },
+      { x: WORLD.posts[1].x, y: WORLD.posts[1].y + 82, color: 0x67e8f9 },
+    ];
+    for (const puddle of puddleGroups) {
+      light.fillStyle(0x020711, 0.12);
+      light.fillEllipse(puddle.x + 4, puddle.y + 7, 142, 29);
+      light.fillStyle(puddle.color, 0.055);
+      light.fillEllipse(puddle.x, puddle.y + 1, 128, 22);
+      light.fillStyle(0xe0f2fe, 0.12);
+      light.fillRoundedRect(puddle.x - 47, puddle.y - 2, 26, 1.5, 1);
+      light.fillStyle(puddle.color, 0.1);
+      light.fillRoundedRect(puddle.x + 12, puddle.y + 4, 43, 1.5, 1);
+      light.fillStyle(0xffffff, 0.08);
+      light.fillRoundedRect(puddle.x - 8, puddle.y + 8, 14, 1, 1);
+    }
+
+    // Short broken reflections beneath the building frontage give a subtle
+    // sense of wet paving without creating a noisy repeated pattern.
+    const frontageReflections = [
+      [188, 278, 34, 1, 0xf8fafc, 0.1],
+      [232, 286, 18, 1, 0x67e8f9, 0.11],
+      [678, 279, 41, 1, 0xffd28a, 0.11],
+      [731, 286, 23, 1, 0xe0f2fe, 0.09],
+      [386, 301, 29, 1, 0x94a3b8, 0.08],
+      [549, 307, 36, 1, 0x67e8f9, 0.08],
+    ];
+    for (const [x, y, width, height, color, alpha] of frontageReflections) {
+      light.fillStyle(color, alpha);
+      light.fillRoundedRect(x, y, width, height, 1);
+    }
+
+    // Soft shadow under the car-wash bay apron anchors the buildings to the lot.
+    light.fillStyle(0x02040a, 0.16);
+    for (const pos of WORLD.posts) {
+      light.fillEllipse(pos.x, pos.y + 69, 184, 18);
+      light.fillStyle(0x0b1522, 0.14);
+      light.fillEllipse(pos.x, pos.y + 72, 150, 10);
+    }
   }
 
   _createScenery() {
@@ -390,15 +730,21 @@ export default class CarWashScene extends Phaser.Scene {
       const lbl = this._postStatusLabels[i];
       if (!lbl) continue;
 
-      if (post.broken) {
-        lbl.setText(`⚠ ${WORLD.posts[i].label} • АВАРИЯ`);
+      if (post.unlocked === false) {
+        lbl.setText(`${WORLD.posts[i].label.toUpperCase()} · ЗАКРЫТ`);
+        lbl.setColor('#94a3b8');
+        if (this._postSprites[i]) this._postSprites[i].setAlpha(0.16);
+      } else if (post.broken) {
+        lbl.setText(`${WORLD.posts[i].label.toUpperCase()} · АВАРИЯ`);
         lbl.setColor('#ef4444');
       } else if (post.busy) {
-        lbl.setText(`🚿 ${WORLD.posts[i].label} • МОЙКА`);
+        lbl.setText(`${WORLD.posts[i].label.toUpperCase()} · МОЙКА`);
+        if (this._postSprites[i]) this._postSprites[i].setAlpha(1);
         lbl.setColor('#22c55e');
       } else {
-        lbl.setText(`✓ ${WORLD.posts[i].label} • СВОБОДЕН`);
+        lbl.setText(`${WORLD.posts[i].label.toUpperCase()} · ГОТОВ`);
         lbl.setColor('#38bdf8');
+        if (this._postSprites[i]) this._postSprites[i].setAlpha(1);
       }
     }
   }
@@ -591,8 +937,26 @@ export default class CarWashScene extends Phaser.Scene {
       return;
     }
 
+    const coffeeDistance = Phaser.Math.Distance.Between(this.player.x, this.player.y, 816, 224);
+    if (coffeeDistance < 108) {
+      btnText.textContent = 'КОФЕ';
+      btnSub.textContent = this._coffeeRushUntil > this.time.now ? 'КЛИЕНТЫ ЖДУТ' : 'ПОДДЕРЖАТЬ ОЧЕРЕДЬ';
+      return;
+    }
+
+    // Show the office action before generic bay actions when the player reaches the entrance.
+    const officeDistance = Phaser.Math.Distance.Between(
+      this.player.x, this.player.y, WORLD.building.x, WORLD.building.y + 68
+    );
+    if (officeDistance < 108) {
+      btnText.textContent = 'ОФИС';
+      btnSub.textContent = 'УПРАВЛЕНИЕ БИЗНЕСОМ';
+      return;
+    }
+
     for (let i = 0; i < gameState.posts.length; i++) {
       const post = gameState.posts[i];
+      if (post.unlocked === false) continue;
       if (post.broken) {
         const pos = WORLD.posts[i];
         const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, pos.x, pos.y);
@@ -606,6 +970,7 @@ export default class CarWashScene extends Phaser.Scene {
 
     for (let i = 0; i < gameState.posts.length; i++) {
       const post = gameState.posts[i];
+      if (post.unlocked === false) continue;
       if (post.busy && post.carId) {
         const car = gameState.getCar(post.carId);
         if (car && !car.completed && !car.paid) {
@@ -666,6 +1031,36 @@ export default class CarWashScene extends Phaser.Scene {
 
   _handleInteract() {
     if (gameState.paused || !gameState.shiftActive) return;
+
+    // Coffee Stop is a useful customer amenity: one interaction gives the queue
+    // a short patience boost, so the neighbouring cafe has a clear gameplay role.
+    const coffeeDistance = Phaser.Math.Distance.Between(this.player.x, this.player.y, 816, 224);
+    if (!this._isWashing && coffeeDistance < 96) {
+      this._coffeeRushUntil = this.time.now + 25000;
+      audioManager.play('buttonClick');
+      this._showCoffeeSteamBurst(816, 220);
+      showToast('☕ Кофе готов! Клиенты в очереди подождут ещё 25 секунд.', 'success');
+      return;
+    }
+
+    // Office entrance above the wash bays: open existing business management UI.
+    // Reuse the current HUD action so finances/upgrades stay in one source of truth.
+    const office = WORLD.building;
+    const officeDistance = Phaser.Math.Distance.Between(
+      this.player.x,
+      this.player.y,
+      office.x,
+      office.y + 68
+    );
+    if (!this._isWashing && officeDistance < 92) {
+      const businessButton = document.getElementById('hud-btn-business');
+      if (businessButton && !businessButton.disabled) {
+        businessButton.click();
+      } else {
+        showToast('Офис: открой «Бизнес» в верхнем меню управления.', 'info');
+      }
+      return;
+    }
 
     if (this._isWashing) {
       audioManager.play('waterSpray');
@@ -817,6 +1212,7 @@ export default class CarWashScene extends Phaser.Scene {
     this.player.setTexture('player_idle');
 
     showToast(`Готово! Клиент оплатил +${this._formatMoney(profit)}`, 'success');
+    this._showWashReward(car, profit, quality);
     this._updateCarVisual(car);
 
     const carSprite = this._carSprites[car.id];
@@ -844,6 +1240,42 @@ export default class CarWashScene extends Phaser.Scene {
     this._washingCar = null;
     this.player.setTexture('player_idle');
     hideWashProgress();
+  }
+
+  _showWashReward(car, profit, quality) {
+    const sprite = this._carSprites[car.id];
+    if (!sprite || !sprite.active) return;
+    const perfect = quality >= 0.85;
+    const reward = this.add.container(sprite.x, sprite.y - 28).setDepth(40);
+    const bg = this.add.graphics();
+    bg.fillStyle(perfect ? 0x064e3b : 0x0b2238, 0.94);
+    bg.lineStyle(2, perfect ? 0x34d399 : 0x38bdf8, 0.9);
+    bg.fillRoundedRect(-65, -18, 130, 36, 12);
+    bg.strokeRoundedRect(-65, -18, 130, 36, 12);
+    const label = this.add.text(0, 0, (perfect ? '✦ ИДЕАЛЬНО  ' : '✓ ГОТОВО  ') + '+' + this._formatMoney(profit), {
+      fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '13px', fontStyle: 'bold',
+      color: perfect ? '#86efac' : '#a5f3fc', align: 'center',
+      stroke: '#06111f', strokeThickness: 2,
+    }).setOrigin(0.5);
+    reward.add([bg, label]);
+    this.tweens.add({ targets: reward, y: reward.y - 42, alpha: 0, duration: 1350, ease: 'Cubic.easeOut', onComplete: () => reward.destroy() });
+    if (perfect) {
+      const badge = this.add.text(sprite.x, sprite.y + 28, 'КАЧЕСТВО 85%+', {
+        fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '10px', fontStyle: 'bold',
+        color: '#86efac', backgroundColor: '#052e2b', padding: { x: 7, y: 4 },
+      }).setOrigin(0.5).setDepth(40);
+      this.tweens.add({ targets: badge, y: badge.y + 16, alpha: 0, delay: 300, duration: 900, onComplete: () => badge.destroy() });
+    }
+  }
+
+  _showCoffeeSteamBurst(x, y) {
+    const burst = this.add.particles(x, y, 'particle_mist', {
+      speed: { min: 18, max: 48 }, angle: { min: 230, max: 310 },
+      scale: { start: 0.6, end: 0 }, alpha: { start: 0.75, end: 0 },
+      lifespan: 520, quantity: 8, tint: [0xffd7a0, 0xfff0d0], emitting: false,
+    }).setDepth(30);
+    burst.explode(8, x, y);
+    this.time.delayedCall(650, () => { if (burst && burst.active) burst.destroy(); });
   }
 
   _checkBreakdown(postId) {
@@ -994,6 +1426,7 @@ export default class CarWashScene extends Phaser.Scene {
   _processQueue() {
     for (let i = 0; i < gameState.posts.length; i++) {
       const post = gameState.posts[i];
+      if (post.unlocked === false) continue;
       if (!post.busy && !post.broken && gameState.queue.length > 0) {
         const carId = gameState.queue[0];
         this._moveCarToPost(carId, i);
@@ -1025,7 +1458,35 @@ export default class CarWashScene extends Phaser.Scene {
     }
   }
 
+  _updateQueueMood() {
+    if (!this._queueMoodGfx) return;
+    const gfx = this._queueMoodGfx;
+    gfx.clear();
+    const coffeeActive = this._coffeeRushUntil > this.time.now;
+    for (const carId of gameState.queue) {
+      const car = gameState.getCar(carId);
+      const sprite = this._carSprites[carId];
+      if (!car || !sprite || !sprite.active) continue;
+      const patience = Math.max(1, Number(car.patience) || 1);
+      const ratio = Phaser.Math.Clamp(1 - (car.waitTime || 0) / patience, 0, 1);
+      const x = sprite.x - 18;
+      const y = sprite.y - 27;
+      const color = coffeeActive ? 0x34d399 : ratio < 0.25 ? 0xfb7185 : ratio < 0.5 ? 0xfbbf24 : 0x38bdf8;
+      gfx.fillStyle(0x020817, 0.84);
+      gfx.fillRoundedRect(x - 1, y - 1, 38, 7, 3);
+      gfx.lineStyle(1, color, coffeeActive ? 0.8 : 0.42);
+      gfx.strokeRoundedRect(x - 1, y - 1, 38, 7, 3);
+      if (ratio > 0) {
+        const alpha = ratio < 0.25 && !coffeeActive ? 0.62 + (Math.sin(this.time.now * 0.018) + 1) * 0.19 : 0.95;
+        gfx.fillStyle(color, alpha);
+        gfx.fillRoundedRect(x + 1, y + 1, Math.max(2, 34 * ratio), 3, 2);
+      }
+    }
+  }
+
   _processPatience(delta) {
+    // While the coffee amenity is active, queued customers pause their patience timer.
+    if (this._coffeeRushUntil > this.time.now) return;
     const toRemove = [];
     for (const carId of gameState.queue) {
       const car = gameState.getCar(carId);
@@ -1325,6 +1786,11 @@ export default class CarWashScene extends Phaser.Scene {
 
     this._processQueue();
     this._processPatience(delta);
+    this._queueMoodUpdateTimer += delta;
+    if (this._queueMoodUpdateTimer >= 180) {
+      this._queueMoodUpdateTimer = 0;
+      this._updateQueueMood();
+    }
     this._processEmployees(delta);
 
     this._shiftTimer += delta;
@@ -1471,6 +1937,7 @@ export default class CarWashScene extends Phaser.Scene {
     }
     gameState.cars = [];
     gameState.queue = [];
+    if (this._queueMoodGfx) this._queueMoodGfx.clear();
 
     for (const post of gameState.posts) {
       post.busy = false;
@@ -1496,6 +1963,8 @@ export default class CarWashScene extends Phaser.Scene {
     const income = todayLogs.filter(l => l.type === 'income').reduce((s, l) => s + l.amount, 0);
     const expenses = todayLogs.filter(l => l.type === 'expense').reduce((s, l) => s + l.amount, 0);
     const profit = income - expenses;
+
+    const unlockedToday = todayLogs.filter(log => log.type === 'income' && log.description.startsWith('Достижение:'));
 
     let rows = '';
     for (const log of todayLogs) {
@@ -1535,7 +2004,12 @@ export default class CarWashScene extends Phaser.Scene {
             <td style="color:${profit >= 0 ? '#22c55e' : '#ef4444'}">${profit >= 0 ? '+' : ''}${this._formatMoney(profit)}</td>
           </tr>
         </table>
-        <p style="margin-top:10px;color:#cbd5e1;font-size:12px;">Помыто: <strong>${gameState.stats.todayCarsWashed}</strong> авто</p>
+        <div class="shift-report-metrics">
+          <div><span>АВТО ЗА СМЕНУ</span><strong>${gameState.stats.todayCarsWashed}</strong></div>
+          <div><span>ИДЕАЛЬНЫЕ МОЙКИ</span><strong>${gameState.stats.todayPerfectWashes}</strong></div>
+          <div><span>РЕПУТАЦИЯ</span><strong>${Math.round(gameState.reputation)} / 100</strong></div>
+        </div>
+        ${unlockedToday.length ? `<div class="shift-report-achievements"><strong>🏆 Новые достижения</strong><span>${unlockedToday.map(log => log.description.replace('Достижение: ', '')).join(' · ')}</span></div>` : ''}
         <p style="color:#cbd5e1;font-size:12px;">Баланс кассы: <strong style="color:#38bdf8">${this._formatMoney(gameState.money)}</strong></p>
         ${gameState.money < 0 ? '<p style="color:#ef4444;font-weight:bold;margin-top:6px;font-size:12px;">⚠ Баланс ушел в минус! Оптимизируйте расходы.</p>' : ''}
         <div style="text-align:center;margin-top:14px;">
@@ -1683,6 +2157,8 @@ export default class CarWashScene extends Phaser.Scene {
     this.scale.off('resize', this._handleResize, this);
     saveSystem.stopAutoSave();
     gameState.off('stateChanged', this._onStateChanged);
+    gameState.off('achievementUnlocked', this._onAchievementUnlocked);
+    gameState.off('perfectStreakBonus', this._onPerfectStreakBonus);
     destroyHUD();
     hideWashProgress();
 
@@ -1692,6 +2168,10 @@ export default class CarWashScene extends Phaser.Scene {
 
     if (this._sprayGfx) {
       this._sprayGfx.destroy();
+    }
+    if (this._queueMoodGfx) {
+      this._queueMoodGfx.destroy();
+      this._queueMoodGfx = null;
     }
 
     if (this._touchControlsRoot) {

@@ -12,6 +12,13 @@ function fmt(n) {
   return n.toLocaleString('ru-RU') + ' ₽';
 }
 
+function effectLabel(key, value) {
+  if (key === 'washSpeed' || key === 'supplyEfficiency' || key === 'reliability') return Math.round(value * 100) + '%';
+  if (key === 'equipmentQuality') return '×' + Number(value).toFixed(1);
+  if (key === 'capacity') return String(value) + ' машин';
+  return String(value);
+}
+
 export function showUpgradePanel() {
   const existing = document.querySelector('#upgrade-panel-overlay');
   if (existing) { existing.remove(); return; }
@@ -21,19 +28,27 @@ export function showUpgradePanel() {
   panel.className = 'panel-overlay';
   panel.id = 'upgrade-panel-overlay';
 
+  const unlockedBays = gameState.posts.filter(post => post.unlocked !== false).length;
+  const dailyRevenue = gameState.stats.todayRevenue || 0;
+  const dailyCars = gameState.stats.todayCarsWashed || 0;
   let itemsHtml = '';
   for (const [key, upgrade] of Object.entries(BALANCE.upgrades)) {
     const curLevel = gameState.upgrades[key] || 0;
     const isMax = curLevel >= upgrade.maxLevel;
     const nextPrice = !isMax ? upgrade.prices[curLevel] : null;
     const canAfford = !isMax && gameState.money >= nextPrice;
+    const currentEffect = curLevel > 0 ? upgrade.effects[curLevel - 1] : (key === 'capacity' ? BALANCE.customer.maxQueueSize : 1);
+    const nextEffect = !isMax ? upgrade.effects[curLevel] : null;
+    const effectText = key === 'washSpeed' ? 'Время этапа' : key === 'equipmentQuality' ? 'Качество мойки' : key === 'reliability' ? 'Риск поломки' : key === 'capacity' ? 'Лимит очереди' : 'Расход материалов';
 
     itemsHtml += `
       <div class="upgrade-item">
         <div class="upgrade-info">
           <div class="name">${upgrade.name}</div>
           <div class="desc">${upgrade.description}</div>
+          <div class="upgrade-effect">${effectText}: <strong>${effectLabel(key, currentEffect)}</strong>${!isMax ? ' → <strong>' + effectLabel(key, nextEffect) + '</strong>' : ''}</div>
           <div class="level">Уровень: ${curLevel} / ${upgrade.maxLevel}</div>
+          <div class="upgrade-level-track"><span style="width:${Math.round(curLevel / upgrade.maxLevel * 100)}%"></span></div>
         </div>
         <div>
           ${isMax 
@@ -54,6 +69,12 @@ export function showUpgradePanel() {
       <p style="color:#aaa;font-size:13px;margin-bottom:12px;">
         Доступный баланс: <strong style="color:#00d2d3">${fmt(gameState.money)}</strong>
       </p>
+      <div class="upgrade-overview">
+        <div><span>МОЕЧНЫЕ БОКСЫ</span><strong>${unlockedBays} / ${gameState.posts.length}</strong></div>
+        <div><span>АВТО ЗА СМЕНУ</span><strong>${dailyCars}</strong></div>
+        <div><span>ВЫРУЧКА СЕГОДНЯ</span><strong>${fmt(dailyRevenue)}</strong></div>
+      </div>
+      <p class="upgrade-hint">Совет: скорость увеличивает число машин за смену, а надёжность помогает избежать простоев. Новые боксы открываются в разделе «Бизнес».</p>
       <div class="upgrade-list">
         ${itemsHtml}
       </div>

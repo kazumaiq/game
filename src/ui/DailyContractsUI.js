@@ -28,6 +28,7 @@ export function showDailyContractsPanel() {
   if (!host) return;
 
   const contracts = gameState.getDailyContracts();
+  const careerAchievements = gameState.getCareerAchievements();
   const overlay = document.createElement('div');
   overlay.className = 'panel-overlay daily-contracts-overlay';
   overlay.id = 'daily-contracts-overlay';
@@ -66,6 +67,24 @@ export function showDailyContractsPanel() {
       <div class="daily-contracts-summary">
         <span>Цели смены</span>
         <strong id="daily-contracts-summary">0 из 3 выполнено</strong>
+      </div>
+      <div class="daily-contracts-bonus" id="daily-contracts-bonus">
+        <span class="daily-contracts-bonus-icon">✦</span>
+        <div><strong>Бонус за все контракты</strong><p>Забери все 3 награды и получи дополнительную премию 15 000 ₽.</p></div>
+        <strong class="daily-contracts-bonus-value">+15 000 ₽</strong>
+      </div>
+      <div class="career-streak-banner" id="career-streak-banner"><span>🔥</span><div><strong>Серия идеальных моек</strong><p id="career-streak-copy">Каждая 3-я идеальная мойка подряд приносит денежный бонус.</p></div><strong id="career-streak-count">0 / 3</strong></div>
+      <div class="career-achievements-section">
+        <div class="career-achievements-heading"><div><span>ДОЛГОСРОЧНЫЙ ПРОГРЕСС</span><h3>Достижения карьеры</h3></div><strong id="career-achievements-count">0 / ${careerAchievements.length}</strong></div>
+        <div class="career-achievements-list">
+          ${careerAchievements.map(item => `
+            <article class="career-achievement-card ${item.unlocked ? 'is-unlocked' : ''}" data-achievement-card="${item.id}">
+              <div class="career-achievement-main"><div class="career-achievement-icon">${item.unlocked ? '✓' : '✦'}</div><div class="career-achievement-copy"><strong>${item.title}</strong><p>${item.description}</p></div><span class="career-achievement-reward">+${fmtMoney(item.reward)}</span></div>
+              <div class="career-achievement-progress"><span data-achievement-progress>${item.progress} / ${item.target}</span><span data-achievement-status>${item.unlocked ? 'ПОЛУЧЕНО' : 'В ПРОГРЕССЕ'}</span></div>
+              <div class="career-achievement-track"><span data-achievement-fill style="width:${Math.round(item.progress / item.target * 100)}%"></span></div>
+            </article>
+          `).join('')}
+        </div>
       </div>
     </section>
   `;
@@ -118,6 +137,39 @@ export function showDailyContractsPanel() {
 
     const summary = overlay.querySelector('#daily-contracts-summary');
     if (summary) summary.textContent = `${completedCount} из 3 выполнено · ${claimedCount} наград получено`;
+    const streakBanner = overlay.querySelector('#career-streak-banner');
+    const streakCopy = overlay.querySelector('#career-streak-copy');
+    const streakCount = overlay.querySelector('#career-streak-count');
+    const streak = Math.max(0, Number(gameState.perfectWashStreak) || 0);
+    if (streakBanner) streakBanner.classList.toggle('is-hot', streak > 0);
+    if (streakCopy) streakCopy.textContent = streak > 0 ? `Продолжай серию: ещё ${3 - (streak % 3 || 0)} до следующего бонуса.` : 'Каждая 3-я идеальная мойка подряд приносит денежный бонус.';
+    if (streakCount) streakCount.textContent = `${streak % 3} / 3 · рекорд ${gameState.bestPerfectWashStreak || 0}`;
+
+    const currentAchievements = gameState.getCareerAchievements();
+    const achievementCount = overlay.querySelector('#career-achievements-count');
+    if (achievementCount) achievementCount.textContent = `${currentAchievements.filter(item => item.unlocked).length} / ${currentAchievements.length}`;
+    for (const achievement of currentAchievements) {
+      const card = overlay.querySelector(`[data-achievement-card="${achievement.id}"]`);
+      if (!card) continue;
+      card.classList.toggle('is-unlocked', achievement.unlocked);
+      const progress = card.querySelector('[data-achievement-progress]');
+      const status = card.querySelector('[data-achievement-status]');
+      const fill = card.querySelector('[data-achievement-fill]');
+      const icon = card.querySelector('.career-achievement-icon');
+      if (progress) progress.textContent = `${achievement.progress} / ${achievement.target}`;
+      if (status) status.textContent = achievement.unlocked ? 'ПОЛУЧЕНО' : 'В ПРОГРЕССЕ';
+      if (fill) fill.style.width = `${Math.round(achievement.progress / achievement.target * 100)}%`;
+      if (icon) icon.textContent = achievement.unlocked ? '✓' : '✦';
+    }
+    const bonus = overlay.querySelector('#daily-contracts-bonus');
+    if (bonus) {
+      const allClaimed = currentContracts.length === 3 && currentContracts.every(contract => contract.claimed);
+      bonus.classList.toggle('is-unlocked', allClaimed);
+      const description = bonus.querySelector('p');
+      if (description) description.textContent = allClaimed ? 'Бонус получен! Отличная смена.' : `Забери все 3 награды: осталось ${3 - claimedCount}.`;
+      const value = bonus.querySelector('.daily-contracts-bonus-value');
+      if (value) value.textContent = allClaimed ? '✓ ПОЛУЧЕНО' : '+15 000 ₽';
+    }
   };
 
   const close = () => {
@@ -148,7 +200,7 @@ export function showDailyContractsPanel() {
     if (result.success) {
       audioManager.play('success');
       saveSystem.save();
-      showToast(`Контракт «${result.title}» выполнен: +${fmtMoney(result.reward)}`, 'success');
+      showToast(result.bonus ? `Контракт «${result.title}» выполнен! +${fmtMoney(result.reward)} и бонус +${fmtMoney(result.bonus)} за все цели.` : `Контракт «${result.title}» выполнен: +${fmtMoney(result.reward)}`, 'success');
     } else {
       showToast(result.reason, 'info');
     }
