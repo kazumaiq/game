@@ -2921,3 +2921,18 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
  .bm-card { padding:12px; }.bm-card-icon { flex-basis:36px; width:36px; height:36px; font-size:19px; }
  .bm-buy { max-width:112px; padding:9px 8px; font-size:10px; }.bm-footer { padding:10px 14px 16px; }
 }
+
+
+/* City map and weather controls */
+.bm-city-map { position:relative; grid-column:1/-1; min-height:220px; overflow:hidden; border:1px solid #ffffff14; border-radius:18px; background:radial-gradient(ellipse at 80% 10%,#27565a55,transparent 35%),linear-gradient(135deg,#142b31,#0e1b28 65%,#142333); }
+.bm-map-road { position:absolute; background:#384a56; box-shadow:inset 0 0 0 1px #ffffff0b; }
+.bm-map-road-h { top:48%; left:-2%; width:104%; height:24px; transform:rotate(-7deg); }
+.bm-map-road-v { left:48%; top:-10%; width:24px; height:120%; transform:rotate(12deg); }
+.bm-map-road::after { content:""; position:absolute; left:0; right:0; top:50%; border-top:2px dashed #d1c9a366; }
+.bm-map-district { position:absolute; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; width:36%; min-height:76px; padding:8px; border:1px solid #8ec5c044; border-radius:12px; background:#132c32e8; text-align:center; box-shadow:0 8px 18px #0003; }
+.bm-map-district span { font-size:23px; }.bm-map-district b { font-size:11px; color:#e5f5ff; }.bm-map-district small { color:#8ea9ba; font-size:9px; }
+.district-home { top:10px; left:10px; }.district-center { top:10px; right:10px; }.district-industry { bottom:10px; left:10px; }.district-current { right:10px; bottom:10px; border-color:#61d9d5aa; background:#16434beF; }
+.bm-weather-row { grid-column:1/-1; display:flex; flex-direction:column; gap:10px; padding:14px; border:1px solid #ffffff12; border-radius:16px; background:#ffffff05; }
+.bm-weather-row>b { font-size:13px; }.bm-weather-row small { color:#8ea2b8; font-size:10px; }
+.bm-weather-buttons { display:flex; flex-wrap:wrap; gap:8px; }.bm-weather-buttons button { padding:9px 12px; border:1px solid #ffffff17; border-radius:10px; color:#c3d5e6; background:#ffffff07; cursor:pointer; font-weight:700; font-size:11px; }
+.bm-weather-buttons button.active { color:#eaffff; border-color:#55ced3aa; background:#12616a66; }
