@@ -67,6 +67,11 @@ export function showDailyContractsPanel() {
         <span>Цели смены</span>
         <strong id="daily-contracts-summary">0 из 3 выполнено</strong>
       </div>
+      <div class="daily-contracts-bonus" id="daily-contracts-bonus">
+        <span class="daily-contracts-bonus-icon">✦</span>
+        <div><strong>Бонус за все контракты</strong><p>Забери все 3 награды и получи дополнительную премию 15 000 ₽.</p></div>
+        <strong class="daily-contracts-bonus-value">+15 000 ₽</strong>
+      </div>
     </section>
   `;
 
@@ -118,6 +123,15 @@ export function showDailyContractsPanel() {
 
     const summary = overlay.querySelector('#daily-contracts-summary');
     if (summary) summary.textContent = `${completedCount} из 3 выполнено · ${claimedCount} наград получено`;
+    const bonus = overlay.querySelector('#daily-contracts-bonus');
+    if (bonus) {
+      const allClaimed = currentContracts.length === 3 && currentContracts.every(contract => contract.claimed);
+      bonus.classList.toggle('is-unlocked', allClaimed);
+      const description = bonus.querySelector('p');
+      if (description) description.textContent = allClaimed ? 'Бонус получен! Отличная смена.' : `Забери все 3 награды: осталось ${3 - claimedCount}.`;
+      const value = bonus.querySelector('.daily-contracts-bonus-value');
+      if (value) value.textContent = allClaimed ? '✓ ПОЛУЧЕНО' : '+15 000 ₽';
+    }
   };
 
   const close = () => {
@@ -148,7 +162,7 @@ export function showDailyContractsPanel() {
     if (result.success) {
       audioManager.play('success');
       saveSystem.save();
-      showToast(`Контракт «${result.title}» выполнен: +${fmtMoney(result.reward)}`, 'success');
+      showToast(result.bonus ? `Контракт «${result.title}» выполнен! +${fmtMoney(result.reward)} и бонус +${fmtMoney(result.bonus)} за все цели.` : `Контракт «${result.title}» выполнен: +${fmtMoney(result.reward)}`, 'success');
     } else {
       showToast(result.reason, 'info');
     }
