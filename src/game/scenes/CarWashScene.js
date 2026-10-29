@@ -98,28 +98,28 @@ export default class CarWashScene extends Phaser.Scene {
   }
 
   _handleResize(gameSize) {
-    const width = gameSize.width;
-    const height = gameSize.height;
-
+    const width = Math.max(1, gameSize.width);
+    const height = Math.max(1, gameSize.height);
     const minDim = Math.min(width, height);
     const portraitPhone = width < 460 && height > width;
+
+    // Keep the established, readable camera scale. The previous 0.68 zoom on
+    // portrait phones made the yard tiny and pushed the player visually away.
     let targetZoom = 1.15;
-    if (portraitPhone) {
-      // На узком телефоне показываем оба бокса целиком, а не обрезаем подписи по краям.
-      targetZoom = 0.68;
-    } else if (minDim < 420) {
-      targetZoom = 0.9;
-    } else if (minDim < 650) {
-      targetZoom = 1.05;
-    }
+    if (minDim < 360) targetZoom = 0.95;
+    else if (minDim < 420) targetZoom = 1.0;
+    else if (minDim < 650) targetZoom = 1.05;
 
-    this.cameras.main.setZoom(targetZoom);
-    this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
+    const cam = this.cameras.main;
+    cam.setZoom(targetZoom);
+    cam.setBounds(0, 0, WORLD.width, WORLD.height);
 
-    // Компенсируем уменьшение камеры, чтобы персонаж оставался заметным на портретном экране.
-    if (this.player) {
-      this.player.setScale(portraitPhone ? 0.675 : 0.5);
-    }
+    // Keep character scale stable; don't enlarge the sprite just because the
+    // viewport is portrait. The camera tracks the player after the tutorial.
+    if (this.player) this.player.setScale(0.5);
+
+    // Recompute the active camera target after viewport/orientation changes.
+    if (this.player) this._updateCameraTracking(true);
   }
 
   _createEnvironment() {
@@ -836,6 +836,25 @@ export default class CarWashScene extends Phaser.Scene {
 
   _handleInteract() {
     if (gameState.paused || !gameState.shiftActive) return;
+
+    // Office entrance above the wash bays: open existing business management UI.
+    // Reuse the current HUD action so finances/upgrades stay in one source of truth.
+    const office = WORLD.building;
+    const officeDistance = Phaser.Math.Distance.Between(
+      this.player.x,
+      this.player.y,
+      office.x,
+      office.y + 68
+    );
+    if (!this._isWashing && officeDistance < 92) {
+      const businessButton = document.querySelector('[data-action="business"], #hud-business, #business-btn, [data-panel="business"]');
+      if (businessButton && !businessButton.disabled) {
+        businessButton.click();
+      } else {
+        showToast('Офис: открой «Бизнес» в верхнем меню управления.', 'info');
+      }
+      return;
+    }
 
     if (this._isWashing) {
       audioManager.play('waterSpray');
