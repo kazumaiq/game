@@ -14,6 +14,7 @@ export function createGame() {
 
   const config = {
     type: Phaser.AUTO,
+    transparent: true,
     parent: 'game-container',
     scale: {
       mode: Phaser.Scale.RESIZE,
@@ -40,7 +41,7 @@ export function createGame() {
     input: {
       activePointers: 3, // мультитач
     },
-    backgroundColor: '#0b0e14',
+    backgroundColor: 'rgba(0,0,0,0)',
     scene: [BootScene, MenuScene, LocationSelectScene, CarWashScene],
   };
 
