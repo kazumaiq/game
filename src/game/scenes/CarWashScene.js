@@ -17,7 +17,7 @@ import { getShiftClock, getDayCycleProfile } from '../systems/DayCycle.js';
 
 const WORLD = {
   width: 900,
-  height: 640,
+  height: 820,
   building: { x: 450, y: 105 },
   posts: [
     { x: 300, y: 310, label: 'Бокс 1' },
@@ -135,6 +135,7 @@ export default class CarWashScene extends Phaser.Scene {
     this._onStateChanged = () => {
       updateHUD();
       this._updateUpgradeVisuals();
+      this._createCompetitorVisuals();
     };
     gameState.on('stateChanged', this._onStateChanged);
     this._onAchievementUnlocked = (achievement) => {
@@ -237,12 +238,141 @@ export default class CarWashScene extends Phaser.Scene {
     this._createAmbientLighting();
     this._createScenery();
     this._createCityDetails();
+    this._createCompetitorVisuals();
     this._createUpgradeVisuals();
 
     this.physics.world.setBounds(20, 170, WORLD.width - 40, WORLD.height - 210);
     this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
   }
 
+
+  /**
+   * Physical rival wash across the road. The scene is intentionally built from
+   * lightweight Phaser primitives so it remains crisp on mobile and needs no assets.
+   */
+  _createCompetitorVisuals() {
+    if (this._competitorGroup) {
+      this._competitorGroup.destroy(true);
+      this._competitorGroup = null;
+    }
+    if (!gameState.competitorActive) return;
+
+    const group = this.add.container(0, 0).setDepth(2.2);
+    this._competitorGroup = group;
+    const g = this.add.graphics();
+    group.add(g);
+
+    // Extended street strip and the rival's fenced forecourt, opposite the player.
+    g.fillStyle(0x101722, 1);
+    g.fillRect(0, 620, WORLD.width, 200);
+    g.fillStyle(0x252c36, 1);
+    g.fillRect(0, 604, WORLD.width, 28);
+    g.fillStyle(0xd7dce2, 0.72);
+    for (let x = 22; x < 900; x += 76) g.fillRoundedRect(x, 616, 38, 2, 1);
+    g.fillStyle(0x555f6c, 1);
+    g.fillRect(0, 640, WORLD.width, 3);
+
+    // Parking apron, curb and branded building.
+    g.fillStyle(0x080d15, 0.38);
+    g.fillEllipse(450, 760, 760, 90);
+    g.fillStyle(0x586574, 0.95);
+    g.fillRoundedRect(112, 655, 676, 10, 3);
+    g.fillStyle(0x101a27, 1);
+    g.fillRoundedRect(145, 665, 610, 105, 8);
+    g.fillStyle(gameState.competitorClosed ? 0x222832 : 0x25384b, 1);
+    g.fillRoundedRect(154, 671, 592, 89, 5);
+
+    // Three visible service bays, two visibly failed after the story event.
+    for (let i = 0; i < 3; i++) {
+      const x = 190 + i * 190;
+      g.fillStyle(0x050a12, 1);
+      g.fillRoundedRect(x, 690, 150, 56, 4);
+      g.fillStyle(0x30495d, 0.95);
+      g.fillRoundedRect(x + 5, 695, 140, 46, 2);
+      g.fillStyle(0x0b1522, 0.9);
+      g.fillRect(x + 12, 701, 126, 33);
+      g.fillStyle(0xffb84d, 0.75);
+      g.fillRect(x + 8, 687, 134, 3);
+      if (i < gameState.competitorBrokenBays) {
+        g.lineStyle(4, 0xef4444, 0.9);
+        g.lineBetween(x + 18, 704, x + 132, 735);
+        g.lineBetween(x + 132, 704, x + 18, 735);
+        g.fillStyle(0xef4444, 0.92);
+        g.fillRoundedRect(x + 51, 676, 48, 12, 2);
+      }
+    }
+
+    // Brand fascia and readable sign.
+    g.fillStyle(0x050a12, 0.98);
+    g.fillRoundedRect(315, 645, 270, 31, 5);
+    g.lineStyle(2, 0xf97316, 0.92);
+    g.strokeRoundedRect(315, 645, 270, 31, 5);
+    const title = this.add.text(450, 660, 'КЛИНАВТО', {
+      fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '19px',
+      fontStyle: 'bold', color: gameState.competitorClosed ? '#7f8792' : '#fff1e6',
+      stroke: '#111827', strokeThickness: 4, letterSpacing: 2,
+    }).setOrigin(0.5);
+    group.add(title);
+    const subtitle = this.add.text(450, 680, gameState.competitorClosed
+      ? 'ФИЛИАЛ ЗАКРЫТ' : '47 АВТОМОЕК · МОЙКА ОТ 100 ₽', {
+      fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '8px',
+      fontStyle: 'bold', color: gameState.competitorClosed ? '#f87171' : '#fdba74',
+      letterSpacing: 1,
+    }).setOrigin(0.5);
+    group.add(subtitle);
+
+    // Customer cars and a small opening-day crowd make the rival feel occupied.
+    if (!gameState.competitorClosed) {
+      const carColors = [0x64748b, 0xcbd5e1, 0x9f1239];
+      for (let i = 0; i < 3; i++) {
+        const x = 245 + i * 205;
+        g.fillStyle(0x03060b, 0.55);
+        g.fillEllipse(x, 788, 78, 15);
+        g.fillStyle(carColors[i], 1);
+        g.fillRoundedRect(x - 31, 766, 62, 20, 6);
+        g.fillStyle(0x172638, 1);
+        g.fillRoundedRect(x - 17, 758, 34, 13, 4);
+        g.fillStyle(0x9bdcf3, 0.8);
+        g.fillRoundedRect(x - 13, 760, 26, 8, 2);
+        for (const wx of [x - 20, x + 20]) {
+          g.fillStyle(0x05070b, 1);
+          g.fillCircle(wx, 785, 5);
+        }
+      }
+      for (let i = 0; i < 14; i++) {
+        const x = 270 + (i % 7) * 60;
+        const y = 650 + Math.floor(i / 7) * 13;
+        g.fillStyle(i % 3 === 0 ? 0xfbbf24 : 0xdbeafe, 0.9);
+        g.fillCircle(x, y, 3.2);
+        g.fillStyle(0x334155, 1);
+        g.fillRoundedRect(x - 2.5, y + 3, 5, 8, 2);
+      }
+      // DJ stage and paired moving beams are present on the opening day.
+      if (!gameState.hasStoryFlag('competitor_appears')) {
+        g.fillStyle(0x090d18, 0.98);
+        g.fillRoundedRect(395, 625, 110, 18, 3);
+        g.fillStyle(0xf472b6, 0.9);
+        g.fillRect(405, 628, 90, 2);
+        for (const x of [420, 480]) {
+          const beam = this.add.rectangle(x, 620, 3, 52, 0xf472b6, 0.42).setOrigin(0.5, 0);
+          group.add(beam);
+          this.tweens.add({ targets: beam, angle: { from: -24, to: 24 }, alpha: { from: 0.2, to: 0.65 }, duration: 850, yoyo: true, repeat: -1 });
+        }
+      }
+    } else {
+      g.fillStyle(0x02050a, 0.38);
+      g.fillRoundedRect(154, 671, 592, 89, 5);
+    }
+
+    if (gameState.competitorAcquired) {
+      const acquired = this.add.text(450, 800, 'ВАША ВТОРАЯ ЛОКАЦИЯ', {
+        fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '11px',
+        fontStyle: 'bold', color: '#86efac', backgroundColor: '#07140f',
+        padding: { x: 9, y: 5 },
+      }).setOrigin(0.5);
+      group.add(acquired);
+    }
+  }
 
   /**
    * Visual feedback for purchased upgrades, using lightweight graphics only.
