@@ -54,7 +54,7 @@ export class StorySystem {
           gameState.competitorActive = true;
           showDialog({
             speaker: 'Новости района',
-            text: 'Крупная сеть автомоек "КлинАвто" (47 филиалов по стране) открывает точку в 500 метрах от вас! Возможна ценовая война. Подготовьтесь.',
+            text: 'Через дорогу, прямо напротив вашей мойки, открывается новая точка федеральной сети «КлинАвто». У сети 47 автомоек. На открытии сцена, диджей, толпа гостей и очередь из машин. Региональный директор лично наблюдает за запуском. Это уже не просто сосед, а серьёзный конкурент.',
             choices: [
               { text: 'Буду бороться!', action: () => {
                 showToast('Конкурент появился рядом', 'warning');
@@ -71,7 +71,7 @@ export class StorySystem {
           gameState.competitorPriceWar = true;
           showDialog({
             speaker: 'Новости района',
-            text: `"КлинАвто" запустила акцию — мойка за ${BALANCE.competitor.priceWarPrice} ₽! Ваш поток клиентов заметно уменьшился. Нужно решить: снижать цены, повышать качество или запускать маркетинг.`,
+            text: `«КлинАвто» начинает демпинг: мойка за ${BALANCE.competitor.priceWarPrice} ₽ против ваших ${gameState.servicePrice} ₽. Поток падает примерно с 40 до 3-5 машин за день. Вы вложили почти 6 000 000 ₽, на счету осталось около 600 000 ₽. Директор предлагает выкупить вашу автомойку за 1 200 000 ₽. Придётся выбирать стратегию и держаться.`,
             choices: [
               { text: 'Изучу варианты', action: () => {
                 showToast('Ценовая война началась! Откройте управление бизнесом.', 'warning');
@@ -125,13 +125,50 @@ export class StorySystem {
         condition: () => gameState.hasStoryFlag('buyout_rejected') && gameState.reputation >= 60,
         handler: (scene) => {
           gameState.competitorPriceWar = false;
+          gameState.competitorBrokenBays = 2;
+          gameState.competitorClosed = true;
+          gameState.competitorPriceWar = false;
           showDialog({
             speaker: 'Новости района',
-            text: '"КлинАвто" прекратила демпинг — акция оказалась убыточной. Ваша стойкость и качество окупились! Поток клиентов восстанавливается.',
+            text: 'После затяжной ценовой войны у «КлинАвто» выходят из строя два моечных бокса. Ремонт затягивается, расходы сети растут. Поток клиентов постепенно возвращается к вам. Впервые за долгое время директор сети теряет уверенность.',
             choices: [{ text: 'Победа!', action: () => {
               showToast('Конкурент отступил!', 'success');
               gameState.changeReputation(10);
             }}],
+          });
+        },
+      },
+      {
+        id: 'competitor_final_buyout',
+        day: BALANCE.competitor.buyoutOfferDay + 5,
+        flag: 'competitor_final_buyout',
+        condition: () => gameState.hasStoryFlag('buyout_rejected') && gameState.competitorClosed,
+        handler: (scene) => {
+          showDialog({
+            speaker: 'Региональный директор «КлинАвто»',
+            text: 'Мы закрываем эту точку. Выстояли там, где не справилась федеральная сеть. Предлагаю другую сделку: продадим вам оборудование и готовый бизнес этой автомойки за 1 200 000 ₽. Решение за вами.',
+            choices: [
+              { text: 'Купить точку и оборудование за 1 200 000 ₽', action: () => {
+                if (gameState.money < 1_200_000) {
+                  showToast('Не хватает 1 200 000 ₽. Предложение пока остаётся открытым.', 'warning');
+                  gameState.setStoryFlag('competitor_buyout_declined');
+                  return;
+                }
+                gameState.money -= 1_200_000;
+                gameState._logFinance('expense', 'Покупка точки «КлинАвто»', 1_200_000);
+                gameState.competitorAcquired = true;
+                gameState.setStoryFlag('competitor_acquired');
+                showDialog({
+                  speaker: 'Новая глава',
+                  text: 'Вы выкупили закрывшуюся точку «КлинАвто». Теперь у вас две автомойки и шанс построить собственную сеть.',
+                  choices: [{ text: 'Продолжить', action: () => showToast('Новая точка добавлена в вашу историю.', 'success') }],
+                });
+              }},
+              { text: 'Пока отказаться', action: () => {
+                gameState.setStoryFlag('competitor_buyout_declined');
+                showToast('Вы отказались от покупки. Точка остаётся закрытой.', 'info');
+              }},
+            ],
           });
         },
       },
