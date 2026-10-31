@@ -1941,6 +1941,10 @@ export default class CarWashScene extends Phaser.Scene {
     for (const empId of Object.keys(this._employeeSprites)) {
       const data = this._employeeSprites[empId];
       if (data && data.sprite && data.sprite.active) {
+        data.workTween?.stop();
+        data.workTween = null;
+        data.sprite.setScale(0.5);
+        data.sprite.setAngle(0);
         data.sprite.setTexture('employee_idle');
         const rest = this._getEmployeeRestPos(empId);
         data.sprite.setPosition(rest.x, rest.y);
@@ -2187,6 +2191,14 @@ export default class CarWashScene extends Phaser.Scene {
     gameState.off('perfectStreakBonus', this._onPerfectStreakBonus);
     destroyHUD();
     hideWashProgress();
+
+    for (const data of Object.values(this._employeeSprites)) {
+      data?.workTween?.stop();
+      if (data?.sprite?.active) {
+        data.sprite.setScale(0.5);
+        data.sprite.setAngle(0);
+      }
+    }
 
     if (this._targetHighlight) {
       this._targetHighlight.destroy();
