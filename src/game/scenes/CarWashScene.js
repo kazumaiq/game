@@ -1036,10 +1036,13 @@ export default class CarWashScene extends Phaser.Scene {
     // a short patience boost, so the neighbouring cafe has a clear gameplay role.
     const coffeeDistance = Phaser.Math.Distance.Between(this.player.x, this.player.y, 816, 224);
     if (!this._isWashing && coffeeDistance < 96) {
+      // One coffee bonus per 25 seconds. Ignore repeated interaction while active:
+      // no timer refresh, no sound spam and no repeated full-screen notification.
+      if (this._coffeeRushUntil > this.time.now) return;
       this._coffeeRushUntil = this.time.now + 25000;
       audioManager.play('buttonClick');
       this._showCoffeeSteamBurst(816, 220);
-      showToast('☕ Кофе готов! Клиенты в очереди подождут ещё 25 секунд.', 'success');
+      showToast('☕ Кофейный бонус активирован · 25 сек.', 'success');
       return;
     }
 
