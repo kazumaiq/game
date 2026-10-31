@@ -27,7 +27,8 @@ export class ThreeWashEnvironment {
       stencil: false,
       depth: true,
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, mobile ? 1.25 : 1.75));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, mobile ? 1.0 : 1.5));
+    this.renderer.setClearColor(0x000000, 0);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -231,8 +232,10 @@ export class ThreeWashEnvironment {
     const view = cam.worldView;
     const viewW = Math.max(1, view.width || cam.width / cam.zoom);
     const viewH = Math.max(1, view.height || cam.height / cam.zoom);
-    const centerX = (view.x || 0) + viewW / 2;
-    const centerY = WORLD.height - ((view.y || 0) + viewH / 2);
+    // Phaser worldView is already expressed in unzoomed world coordinates.
+    // Match its center exactly; only invert Y because the Three.js camera uses Y-up.
+    const centerX = (Number.isFinite(view.x) ? view.x : cam.scrollX) + viewW / 2;
+    const centerY = WORLD.height - ((Number.isFinite(view.y) ? view.y : cam.scrollY) + viewH / 2);
     this.camera.left = -viewW / 2;
     this.camera.right = viewW / 2;
     this.camera.top = viewH / 2;
