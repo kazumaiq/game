@@ -1565,8 +1565,9 @@ export default class CarWashScene extends Phaser.Scene {
     for (const emp of gameState.employees) {
       if (emp.status !== 'idle') continue;
 
-      // Сначала проверка: есть ли сломанный бокс для ремонта техником?
+      // Техники и универсалы в первую очередь берут задачи ремонта.
       let foundTask = false;
+      if (emp.role !== 'washer') {
       for (let i = 0; i < gameState.posts.length; i++) {
         const post = gameState.posts[i];
         if (post.broken && !this._isEmployeeRepairing(post.id)) {
@@ -1577,9 +1578,10 @@ export default class CarWashScene extends Phaser.Scene {
           break;
         }
       }
-      if (foundTask) continue;
+      }
+      if (foundTask || emp.role === 'mechanic') continue;
 
-      // Затем проверка: есть ли машина на мойке в свободном боксе?
+      // Мойщики и универсалы обслуживают машины; техники не отвлекаются от ремонта.
       for (let i = 0; i < gameState.posts.length; i++) {
         const post = gameState.posts[i];
         if (post.busy && post.carId && !post.broken) {
