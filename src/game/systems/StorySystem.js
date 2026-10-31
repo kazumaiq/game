@@ -95,9 +95,11 @@ export class StorySystem {
               {
                 text: `Продать за ${BALANCE.competitor.buyoutPrice.toLocaleString('ru-RU')} ₽`,
                 action: () => {
-                  gameState.buyoutAccepted = true;
-                  gameState.money += BALANCE.competitor.buyoutPrice;
-                  gameState._logFinance('income', 'Продажа бизнеса', BALANCE.competitor.buyoutPrice);
+                  const sale = gameState.acceptBusinessBuyout();
+                  if (!sale.success) {
+                    showToast(sale.reason, 'warning');
+                    return;
+                  }
                   showDialog({
                     speaker: 'Эпилог',
                     text: `Вы продали бизнес за ${BALANCE.competitor.buyoutPrice.toLocaleString('ru-RU')} ₽. Итоговый баланс: ${gameState.money.toLocaleString('ru-RU')} ₽. Может быть, стоило побороться дальше?`,
@@ -156,17 +158,13 @@ export class StorySystem {
                   showToast('Не хватает 1 200 000 ₽. Предложение появится снова, когда накопите нужную сумму.', 'warning');
                   return;
                 }
-                gameState.money -= 1_200_000;
-                gameState.stats.totalExpenses += 1_200_000;
-                gameState.stats.todayExpenses += 1_200_000;
-                gameState._logFinance('expense', 'Покупка оборудования «КлинАвто»', 1_200_000);
-                gameState.competitorAcquired = true;
-                gameState.posts[2].unlocked = true;
-                gameState.posts[3].unlocked = true;
-                gameState.posts[2].maintenance = 100;
-                gameState.posts[3].maintenance = 100;
-                gameState.setStoryFlag('competitor_acquired');
-                gameState.emit('stateChanged');
+                const purchase = gameState.acquireCompetitorAssets();
+                if (!purchase.success) {
+                  showToast(purchase.reason === 'Недостаточно средств'
+                    ? 'Не хватает 1 200 000 ₽. Предложение появится снова, когда накопите нужную сумму.'
+                    : purchase.reason, 'warning');
+                  return;
+                }
                 showDialog({
                   speaker: 'Новая глава',
                   text: 'Вы выкупили оборудование и клиентскую базу закрывшейся точки «КлинАвто». Два дополнительных бокса теперь доступны на вашей площадке. Вы расширили автомойку до четырёх постов.',
@@ -201,21 +199,13 @@ export class StorySystem {
                   showToast('На счету снова недостаточно средств.', 'warning');
                   return;
                 }
-                gameState.money -= price;
-                gameState.stats.totalExpenses += price;
-                gameState.stats.todayExpenses += price;
-                gameState._logFinance('expense', 'Покупка оборудования «КлинАвто»', price);
-                for (const postId of ['post_3', 'post_4']) {
-                  const post = gameState.posts.find(item => item.id === postId);
-                  if (post) {
-                    post.unlocked = true;
-                    post.broken = false;
-                    post.maintenance = 100;
-                  }
+                const purchase = gameState.acquireCompetitorAssets();
+                if (!purchase.success) {
+                  showToast(purchase.reason === 'Недостаточно средств'
+                    ? 'На счету снова недостаточно средств.'
+                    : purchase.reason, 'warning');
+                  return;
                 }
-                gameState.competitorAcquired = true;
-                gameState.setStoryFlag('competitor_acquired');
-                gameState.emit('stateChanged');
                 showToast('Два дополнительных бокса открыты!', 'success');
               }},
               { text: 'Отказаться', action: () => {
