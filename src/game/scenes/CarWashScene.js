@@ -68,6 +68,37 @@ export default class CarWashScene extends Phaser.Scene {
     this._sprayGfx = this.add.graphics();
     this._sprayGfx.setDepth(22);
 
+    // Reusable emitters: continuous mist while the player washes, no per-frame
+    // allocation of particle objects. Phaser 3.90 keeps these lightweight.
+    this._waterMist = this.add.particles(0, 0, 'particle_water', {
+      emitting: false,
+      frequency: 28,
+      quantity: 2,
+      lifespan: { min: 260, max: 520 },
+      speed: { min: 34, max: 105 },
+      angle: { min: 205, max: 335 },
+      gravityY: 58,
+      scale: { start: 0.72, end: 0.08 },
+      alpha: { start: 0.78, end: 0 },
+      tint: [0xeffaff, 0x7dd3fc, 0x38bdf8],
+      blendMode: Phaser.BlendModes.ADD,
+      maxParticles: 42,
+    }).setDepth(23);
+    this._foamMist = this.add.particles(0, 0, 'particle_foam', {
+      emitting: false,
+      frequency: 48,
+      quantity: 1,
+      lifespan: { min: 420, max: 760 },
+      speed: { min: 12, max: 52 },
+      angle: { min: 205, max: 335 },
+      gravityY: -8,
+      scale: { start: 0.9, end: 0.18 },
+      alpha: { start: 0.7, end: 0 },
+      tint: [0xffffff, 0xe0f2fe],
+      maxParticles: 26,
+    }).setDepth(23.1);
+    this._activeSprayEmitter = null;
+
     // One shared lightweight canvas layer tracks waiting-customer patience without
     // creating dozens of per-car DOM elements or particle emitters.
     this._queueMoodGfx = this.add.graphics().setDepth(20.4);
@@ -2099,54 +2130,92 @@ export default class CarWashScene extends Phaser.Scene {
     if (!this._sprayGfx) return;
     this._sprayGfx.clear();
 
-    if (!this._isWashing || !this._washingCar) return;
+    if (!this._isWashing || !this._washingCar) {
+      if (this._activeSprayEmitter) this._activeSprayEmitter.stop();
+      if (this._waterMist?.emitting) this._waterMist.stop();
+      if (this._foamMist?.emitting) this._foamMist.stop();
+      this._activeSprayEmitter = null;
+      return;
+    }
 
     const car = gameState.getCar(this._washingCar);
     const sprite = this._carSprites[this._washingCar];
-    if (!car || !sprite) return;
+    if (!car || !sprite || !this.player) return;
 
     const stages = BALANCE.services.expressWash.stages;
     const currentStage = stages[car.washStage] || 'foam';
-
     const pX = this.player.x + 14;
     const pY = this.player.y - 6;
-
     const t = (time || 0) * 0.006;
     const targetX = sprite.x + Math.sin(t * 3) * 16;
     const targetY = sprite.y + Math.cos(t * 4) * 8;
-
     const isFoam = currentStage === 'foam';
-    const sprayColor = isFoam ? 0xffffff : 0x38bdf8;
-    const sprayAlpha = isFoam ? 0.8 : 0.65;
+    const emitter = isFoam ? this._foamMist : this._waterMist;
+    const inactive = isFoam ? this._waterMist : this._foamMist;
 
-    // Струя воды/пены под высоким давлением (конус)
-    this._sprayGfx.lineStyle(3, sprayColor, sprayAlpha);
+    if (inactive?.emitting) inactive.stop();
+    if (this._activeSprayEmitter !== emitter) {
+      this._activeSprayEmitter?.stop();
+      emitter?.start();
+      this._activeSprayEmitter = emitter;
+    }
+    emitter?.setPosition(targetX, targetY);
+
+    const color = isFoam ? 0xeafaff : 0x67dfff;
+    const alpha = isFoam ? 0.7 : 0.62;
+    const dx = targetX - pX;
+    const dy = targetY - pY;
+    const length = Math.max(1, Math.hypot(dx, dy));
+    const nx = -dy / length;
+    const ny = dx / length;
+
+    // Layered pressure stream: soft outer cone, bright core and moving glints.
+    this._sprayGfx.lineStyle(isFoam ? 8 : 6, color, alpha * 0.12);
     this._sprayGfx.lineBetween(pX, pY, targetX, targetY);
+    this._sprayGfx.lineStyle(isFoam ? 3.2 : 2.2, color, alpha);
+    this._sprayGfx.lineBetween(pX, pY, targetX, targetY);
+    this._sprayGfx.lineStyle(1, 0xffffff, 0.78);
+    this._sprayGfx.lineBetween(pX + nx * 1.5, pY + ny * 1.5, targetX + nx, targetY + ny);
 
-    this._sprayGfx.lineStyle(1.5, sprayColor, sprayAlpha * 0.45);
-    this._sprayGfx.lineBetween(pX, pY, targetX - 10, targetY - 6);
-    this._sprayGfx.lineBetween(pX, pY, targetX + 10, targetY + 6);
+    const pulse = 0.72 + Math.sin(t * 7) * 0.16;
+    this._sprayGfx.fillStyle(color, 0.16);
+    this._sprayGfx.fillCircle(targetX, targetY, (isFoam ? 18 : 13) * pulse);
+    this._sprayGfx.fillStyle(color, 0.46);
+    this._sprayGfx.fillCircle(targetX, targetY, isFoam ? 7 : 4.5);
+    this._sprayGfx.fillStyle(0xffffff, 0.72);
+    this._sprayGfx.fillCircle(targetX - 2, targetY - 2, isFoam ? 2.8 : 1.8);
 
-    // Пятно контакта и водяная пыль
-    this._sprayGfx.fillStyle(sprayColor, 0.85);
-    this._sprayGfx.fillCircle(targetX, targetY, isFoam ? 9 : 6);
-    this._sprayGfx.fillStyle(0xffffff, 0.4);
-    this._sprayGfx.fillCircle(targetX, targetY, isFoam ? 16 : 11);
+    // Small directional spray streaks make the impact read at phone scale.
+    for (let i = 0; i < 3; i++) {
+      const phase = t * 2.2 + i * 2.1;
+      const offset = Math.sin(phase) * (isFoam ? 8 : 12);
+      const x = targetX + nx * offset;
+      const y = targetY + ny * offset;
+      this._sprayGfx.fillStyle(0xffffff, 0.34 - i * 0.07);
+      this._sprayGfx.fillCircle(x, y, isFoam ? 2.2 : 1.5);
+    }
   }
 
   _spawnSplashBurst(x, y, isFoam = false) {
+    const emitter = isFoam ? this._foamMist : this._waterMist;
+    if (emitter && emitter.active) {
+      emitter.explode(isFoam ? 9 : 13, x, y);
+      return;
+    }
+
+    // Safe fallback if a burst is requested during scene teardown.
     const tex = isFoam ? 'particle_foam' : 'particle_water';
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 5; i++) {
       const p = this.add.image(x, y, tex).setDepth(23);
-      const angle = (Math.PI * 2 * i) / 7 + (Math.random() - 0.5) * 0.5;
-      const speed = 25 + Math.random() * 35;
+      const angle = (Math.PI * 2 * i) / 5 + (Math.random() - 0.5) * 0.4;
+      const speed = 22 + Math.random() * 28;
       this.tweens.add({
         targets: p,
         x: x + Math.cos(angle) * speed,
         y: y + Math.sin(angle) * speed,
-        scale: { from: 1, to: 0.2 },
-        alpha: { from: 1, to: 0 },
-        duration: 320 + Math.random() * 120,
+        scale: { from: 0.8, to: 0.12 },
+        alpha: { from: 0.8, to: 0 },
+        duration: 300 + Math.random() * 100,
         ease: 'Power1',
         onComplete: () => p.destroy(),
       });
@@ -2231,6 +2300,11 @@ export default class CarWashScene extends Phaser.Scene {
     if (this._sprayGfx) {
       this._sprayGfx.destroy();
     }
+    if (this._waterMist) this._waterMist.destroy();
+    if (this._foamMist) this._foamMist.destroy();
+    this._waterMist = null;
+    this._foamMist = null;
+    this._activeSprayEmitter = null;
     if (this._queueMoodGfx) {
       this._queueMoodGfx.destroy();
       this._queueMoodGfx = null;
