@@ -130,6 +130,16 @@ export function showBusinessPanel() {
       </div>
 
       <div class="panel-section">
+        <h3>Склад автохимии</h3>
+        <div class="business-health-grid">
+          <div><span>Комплектов на складе</span><strong>${gameState.suppliesStock}</strong></div>
+          <div><span>Партия поставки</span><strong>50 шт.</strong></div>
+        </div>
+        <p style="color:#94a3b8;font-size:12px;">Один комплект расходуется на завершённую мойку. Следи за остатком, чтобы боксы не простаивали.</p>
+        <button class="game-btn primary" id="btn-buy-supplies" style="width:100%;" ${gameState.money < 25000 ? "disabled" : ""}>Заказать 50 комплектов · 25 000 ₽</button>
+      </div>
+
+      <div class="panel-section">
         <h3>Сотрудники (${gameState.employees.length}/${BALANCE.employee.maxEmployees})</h3>
         ${empHtml}
         ${canHire 
@@ -250,6 +260,23 @@ export function showBusinessPanel() {
       if (result.success) {
         audioManager.play('success');
         showToast('Программа лояльности подключена!', 'success');
+        panel.remove();
+        showBusinessPanel();
+      } else {
+        audioManager.play('error');
+        showToast(result.reason, 'warning');
+      }
+    });
+  }
+
+  // Закупка материалов для склада.
+  const suppliesBtn = document.getElementById('btn-buy-supplies');
+  if (suppliesBtn) {
+    suppliesBtn.addEventListener('click', () => {
+      const result = gameState.buySuppliesStock();
+      if (result.success) {
+        audioManager.play('success');
+        showToast('Склад пополнен: 50 комплектов', 'success');
         panel.remove();
         showBusinessPanel();
       } else {
