@@ -252,6 +252,13 @@ export default class CarWashScene extends Phaser.Scene {
    * lightweight Phaser primitives so it remains crisp on mobile and needs no assets.
    */
   _createCompetitorVisuals() {
+    const visualKey = [
+      gameState.competitorActive, gameState.competitorBrokenBays,
+      gameState.competitorClosed, gameState.competitorAcquired,
+      gameState.day <= BALANCE.competitor.appearDay,
+    ].join(':');
+    if (visualKey === this._competitorVisualKey) return;
+    this._competitorVisualKey = visualKey;
     if (this._competitorGroup) {
       this._competitorGroup.destroy(true);
       this._competitorGroup = null;
@@ -2681,6 +2688,11 @@ export default class CarWashScene extends Phaser.Scene {
       }
     }
 
+    if (this._competitorGroup) {
+      this._competitorGroup.destroy(true);
+      this._competitorGroup = null;
+    }
+    this._competitorVisualKey = null;
     if (this._targetHighlight) {
       this._targetHighlight.destroy();
     }
