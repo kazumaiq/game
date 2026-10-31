@@ -17,6 +17,16 @@ export default class MenuScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#060a12');
 
     this._objects = [];
+    this._menuElapsed = 0;
+    this.cameras.main.setZoom(1.012);
+    this.tweens.add({
+      targets: this.cameras.main,
+      zoom: 1.028,
+      duration: 14000,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.inOut',
+    });
 
     // === КИНОШНЫЙ НЕБОСКЛОН: глубокий индиго переходит в тёплый закат ===
     const skyGrad = this.add.graphics();
@@ -340,7 +350,8 @@ export default class MenuScene extends Phaser.Scene {
   }
 
   update(time, delta) {
-    const dt = delta / 16.67; // нормализация к 60fps
+    const dt = Math.min(2.5, delta / 16.67); // нормализация с защитой от скачка после background
+    this._menuElapsed += delta;
 
     // Пена — пульсация
     if (this._foamGfx) {
