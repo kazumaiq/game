@@ -776,6 +776,7 @@ export default class CarWashScene extends Phaser.Scene {
       const active = !!post.busy && !post.broken;
       const broken = !!post.broken;
       const pulse = 0.5 + (Math.sin(phase * 1.7 + i) + 1) * 0.18;
+      const rollerPhase = phase * (active ? 2.2 : 0.28);
 
       // Gantry crossbar and compact service-status lamp.
       g.fillStyle(0x071522, 0.88);
@@ -797,7 +798,7 @@ export default class CarWashScene extends Phaser.Scene {
         g.fillRoundedRect(x - 5, y - 27, 10, 54, 5);
         g.lineStyle(2, active ? 0x9be7ff : 0x94a3b8, active ? 0.72 : 0.3);
         for (let spoke = 0; spoke < 4; spoke++) {
-          const a = phase * (active ? 2.2 : 0.28) + spoke * Math.PI / 2 + (side < 0 ? Math.PI / 4 : 0);
+          const a = rollerPhase + spoke * Math.PI / 2 + (side < 0 ? Math.PI / 4 : 0);
           const x1 = x + Math.cos(a) * 3;
           const y1 = y + Math.sin(a) * 3;
           const x2 = x + Math.cos(a) * 9;
@@ -808,6 +809,15 @@ export default class CarWashScene extends Phaser.Scene {
           g.fillStyle(0x67e8f9, 0.08 + pulse * 0.08);
           g.fillEllipse(x, y, 25, 66);
         }
+      }
+
+      // Animated floor-level guide lights travel along the gantry during a wash.
+      if (active) {
+        const travel = (time * 0.035 + i * 29) % 182;
+        g.fillStyle(0x67e8f9, 0.62);
+        g.fillCircle(pos.x - 91 + travel, pos.y - 77, 2.2);
+        g.fillStyle(0x67e8f9, 0.12);
+        g.fillCircle(pos.x - 91 + travel, pos.y - 77, 6);
       }
 
       // A visible coiled hose hangs from the gantry while the post is operating.
@@ -1738,7 +1748,16 @@ export default class CarWashScene extends Phaser.Scene {
       padding: { x: 5, y: 2 },
     }).setOrigin(0.5).setDepth(15);
 
-    this._employeeSprites[emp.id] = { sprite, label, emp };
+    const idleTween = this.tweens.add({
+      targets: sprite,
+      scaleY: { from: 0.49, to: 0.515 },
+      angle: { from: -1.2, to: 1.2 },
+      duration: 1450 + (index % 3) * 180,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+    this._employeeSprites[emp.id] = { sprite, label, emp, idleTween, workTween: null, shadow: null };
   }
 
   _startEmployeeRepair(emp, bayIndex) {
@@ -1748,7 +1767,11 @@ export default class CarWashScene extends Phaser.Scene {
     const targetY = postPos.y + 16;
 
     if (data && data.sprite) {
-      data.sprite.setTexture('employee_walk_1');
+      data.idleTween?.stop();
+      data.idleTween = null;
+      data.workTween?.stop();
+      data.workTween = null;
+      data.sprite.setScale(0.5).setAngle(0).setTexture('employee_walk_1');
       this.tweens.add({
         targets: data.sprite,
         x: targetX,
@@ -1758,6 +1781,16 @@ export default class CarWashScene extends Phaser.Scene {
         onComplete: () => {
           if (this._destroyed || !data.sprite.active) return;
           data.sprite.setTexture('employee_repair');
+          data.workTween = this.tweens.add({
+            targets: data.sprite,
+            scaleY: { from: 0.47, to: 0.55 },
+            angle: { from: -7, to: 5 },
+            x: { from: targetX - 2, to: targetX + 2 },
+            duration: 190,
+            yoyo: true,
+            repeat: 10,
+            ease: 'Sine.easeInOut',
+          });
           this._spawnRepairSparks(targetX, targetY);
           audioManager.play('wrenchRepair');
 
@@ -1787,6 +1820,8 @@ export default class CarWashScene extends Phaser.Scene {
     if (!data || !data.sprite || !data.sprite.active) return;
     data.workTween?.stop();
     data.workTween = null;
+    data.idleTween?.stop();
+    data.idleTween = null;
     data.sprite.setScale(0.5);
     data.sprite.setAngle(0);
     const rest = this._getEmployeeRestPos(emp.id);
@@ -1801,6 +1836,15 @@ export default class CarWashScene extends Phaser.Scene {
       onComplete: () => {
         if (data.sprite.active) {
           data.sprite.setTexture('employee_idle');
+          data.idleTween = this.tweens.add({
+            targets: data.sprite,
+            scaleY: { from: 0.49, to: 0.515 },
+            angle: { from: -1.2, to: 1.2 },
+            duration: 1450 + (Math.max(0, gameState.employees.findIndex(item => item.id === emp.id)) % 3) * 180,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut',
+          });
         }
       },
     });
@@ -1817,7 +1861,11 @@ export default class CarWashScene extends Phaser.Scene {
 
     const empData = this._employeeSprites[emp.id];
     if (empData && empData.sprite) {
-      empData.sprite.setTexture('employee_walk_1');
+      empData.idleTween?.stop();
+      empData.idleTween = null;
+      empData.workTween?.stop();
+      empData.workTween = null;
+      empData.sprite.setScale(0.5).setAngle(0).setTexture('employee_walk_1');
       this.tweens.add({
         targets: empData.sprite,
         x: targetX,
@@ -1850,9 +1898,11 @@ export default class CarWashScene extends Phaser.Scene {
       empData.workTween?.stop();
       empData.workTween = this.tweens.add({
         targets: empData.sprite,
-        scaleY: { from: 0.48, to: 0.54 },
-        angle: { from: -4, to: 4 },
-        duration: 280,
+        scaleY: { from: 0.47, to: 0.55 },
+        scaleX: { from: 0.505, to: 0.49 },
+        angle: { from: -5, to: 5 },
+        x: { from: targetX - 2, to: targetX + 2 },
+        duration: 310,
         yoyo: true,
         repeat: -1,
         ease: 'Sine.easeInOut',
