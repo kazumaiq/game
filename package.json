@@ -20,7 +20,8 @@
   "license": "ISC",
   "description": "Автомойка: Бизнес на грани - браузерный 2.5D симулятор и тайкун",
   "dependencies": {
-    "phaser": "3.90.0"
+    "phaser": "3.90.0",
+    "three": "^0.180.0"
   },
   "devDependencies": {
     "puppeteer-core": "^24.43.1",
