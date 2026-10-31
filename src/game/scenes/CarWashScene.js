@@ -138,6 +138,7 @@ export default class CarWashScene extends Phaser.Scene {
       this._createCompetitorVisuals();
     };
     gameState.on('stateChanged', this._onStateChanged);
+    this._createCompetitorVisuals();
     this._onAchievementUnlocked = (achievement) => {
       audioManager.play('success');
       showToast(`🏆 ${achievement.title} · +${this._formatMoney(achievement.reward)}`, 'success');
@@ -348,7 +349,7 @@ export default class CarWashScene extends Phaser.Scene {
         g.fillRoundedRect(x - 2.5, y + 3, 5, 8, 2);
       }
       // DJ stage and paired moving beams are present on the opening day.
-      if (!gameState.hasStoryFlag('competitor_appears')) {
+      if (gameState.day <= BALANCE.competitor.appearDay) {
         g.fillStyle(0x090d18, 0.98);
         g.fillRoundedRect(395, 625, 110, 18, 3);
         g.fillStyle(0xf472b6, 0.9);
