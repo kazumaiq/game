@@ -1447,12 +1447,26 @@ export default class CarWashScene extends Phaser.Scene {
     if (sprite) {
       audioManager.play('carDepart');
       this.tweens.killTweensOf(sprite);
+      if (shadow) this.tweens.killTweensOf(shadow);
       delete sprite._queueTargetX;
       sprite.setScale(0.5);
+      // Keep the contact shadow slightly behind and below the vehicle while it exits.
+      if (shadow) {
+        shadow.setPosition(sprite.x + 3, sprite.y + 9).setScale(0.49).setAlpha(sprite.alpha * 0.38);
+        this.tweens.add({
+          targets: shadow,
+          x: WORLD.exit.x + 83,
+          y: WORLD.roadY + 9,
+          alpha: 0,
+          duration: 1200,
+          ease: 'Power2',
+        });
+      }
       this.tweens.add({
-        targets: [sprite, shadow].filter(Boolean),
+        targets: sprite,
         x: WORLD.exit.x + 80,
         y: WORLD.roadY,
+        alpha: 0,
         duration: 1200,
         ease: 'Power2',
         onComplete: () => {
@@ -2149,8 +2163,18 @@ export default class CarWashScene extends Phaser.Scene {
     for (const carId of Object.keys(this._carSprites)) {
       const sprite = this._carSprites[carId];
       if (sprite && sprite.active) {
-        // Машина гарантированно поверх пола (6) и ниже игрока (15)
-        sprite.setDepth(10 + sprite.y * 0.01);
+        // Машина гарантированно поверх пола (6) и ниже игрока (15).
+        const depth = 10 + sprite.y * 0.01;
+        sprite.setDepth(depth);
+        // Follow the vehicle every frame so the contact shadow never lags
+        // behind during queue shifts, bay assignment or arrival tweens.
+        const shadow = this._carShadows[carId];
+        if (shadow?.active) {
+          shadow.setPosition(sprite.x + 3, sprite.y + Math.max(7, sprite.displayHeight * 0.19));
+          shadow.setScale(sprite.scaleX * 0.98, sprite.scaleY * 0.92);
+          shadow.setDepth(depth - 0.02);
+          shadow.setAlpha(sprite.alpha * 0.38);
+        }
       }
     }
     for (const empId of Object.keys(this._employeeSprites)) {
