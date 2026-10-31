@@ -43,6 +43,7 @@ export default class CarWashScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#0b0e14');
 
     this._createEnvironment();
+    this._createComicBookTreatment();
     this._createPlayer();
     this._setupControls();
 
@@ -246,6 +247,35 @@ export default class CarWashScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
   }
 
+
+
+  /** Original graphic-novel finish: halftones, ink contours and offset neon edges. */
+  _createComicBookTreatment() {
+    if (this._comicBookGfx) this._comicBookGfx.destroy();
+    const g = this.add.graphics().setDepth(1.35);
+    this._comicBookGfx = g;
+    for (let row=0; row<13; row++) for (let col=0; col<22; col++) {
+      const x=18+col*41+(row%2)*12, y=190+row*28;
+      const fade=Math.max(0,1-Math.abs(x-450)/520);
+      g.fillStyle((row+col)%3===0?0xff4f91:0x70e8ff,0.035+fade*0.025);
+      g.fillCircle(x,y,1.15+((row+col)%3)*0.25);
+    }
+    g.lineStyle(2,0xff4f91,0.22);
+    for(let i=0;i<7;i++){const y=176+i*12;g.lineBetween(8,y,112+i*5,y-22);g.lineBetween(892,y+8,790-i*5,y-15);}
+    g.lineStyle(1.5,0x62eaff,0.22);
+    for(let i=0;i<6;i++){const x=42+i*17;g.lineBetween(x,520,x+24,495-i*3);g.lineBetween(858-i*17,520,834-i*24,495-i*3);}
+    const ink=this.add.graphics().setDepth(7.15);
+    ink.lineStyle(3,0x080b16,0.9);ink.strokeRoundedRect(164,14,572,185,12);
+    ink.lineStyle(1.5,0xff4f91,0.72);ink.strokeRoundedRect(160,12,572,185,12);
+    ink.lineStyle(1.5,0x55e8ff,0.72);ink.strokeRoundedRect(168,17,572,185,12);
+    for(const pos of WORLD.posts){
+      const compact=!!pos.expansion,w=compact?176:300,h=compact?112:192;
+      ink.lineStyle(3,0x080b16,0.88);ink.strokeRoundedRect(pos.x-w/2,pos.y-h/2,w,h,8);
+      ink.lineStyle(1.25,0xff4f91,0.58);ink.strokeRoundedRect(pos.x-w/2-2,pos.y-h/2-1,w,h,8);
+      ink.lineStyle(1.25,0x55e8ff,0.58);ink.strokeRoundedRect(pos.x-w/2+2,pos.y-h/2+1,w,h,8);
+    }
+    this._comicContourGfx=ink;
+  }
 
   /**
    * Physical rival wash across the road. The scene is intentionally built from
