@@ -179,6 +179,51 @@ export class StorySystem {
           });
         },
       },
+      {
+        id: 'competitor_final_buyout_retry',
+        day: BALANCE.competitor.buyoutOfferDay + 6,
+        flag: 'competitor_final_buyout_retry',
+        condition: () => gameState.hasStoryFlag('buyout_rejected')
+          && gameState.competitorClosed
+          && !gameState.competitorAcquired
+          && !gameState.hasStoryFlag('competitor_buyout_declined')
+          && gameState.money >= BALANCE.competitor.buyoutPrice,
+        handler: () => {
+          showDialog({
+            speaker: 'Региональный директор «КлинАвто»',
+            text: 'Вы собрали нужную сумму. Предложение о покупке оборудования и клиентской базы всё ещё в силе. Готовы расширить свою автомойку?',
+            choices: [
+              { text: 'Купить за 1 200 000 ₽', action: () => {
+                const price = BALANCE.competitor.buyoutPrice;
+                if (gameState.money < price) {
+                  showToast('На счету снова недостаточно средств.', 'warning');
+                  return;
+                }
+                gameState.money -= price;
+                gameState.stats.totalExpenses += price;
+                gameState.todayExpenses += price;
+                gameState._logFinance('expense', 'Покупка оборудования «КлинАвто»', price);
+                for (const postId of ['post_3', 'post_4']) {
+                  const post = gameState.posts.find(item => item.id === postId);
+                  if (post) {
+                    post.unlocked = true;
+                    post.broken = false;
+                    post.maintenance = 100;
+                  }
+                }
+                gameState.competitorAcquired = true;
+                gameState.setStoryFlag('competitor_acquired');
+                gameState.emit('stateChanged');
+                showToast('Два дополнительных бокса открыты!', 'success');
+              }},
+              { text: 'Отказаться', action: () => {
+                gameState.setStoryFlag('competitor_buyout_declined');
+                showToast('Вы отказались от сделки.', 'info');
+              }},
+            ],
+          });
+        },
+      },
     ];
   }
 
