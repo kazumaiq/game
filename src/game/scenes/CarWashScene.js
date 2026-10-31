@@ -47,6 +47,7 @@ export default class CarWashScene extends Phaser.Scene {
     this._setupControls();
 
     this._carSprites = {};
+    this._carShadows = {};
     this._washingCar = null;
     this._isWashing = false;
     this._coffeeRushUntil = 0;
