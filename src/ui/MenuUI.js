@@ -106,6 +106,7 @@ export function showMenu({ hasSave, onNewGame, onContinue }) {
     if (isTransitioning) return;
     isTransitioning = true;
     audioManager.ensureContext();
+    audioManager.startMenuAmbience();
     audioManager.play('buttonClick');
     onNewGame();
     window.setTimeout(() => { isTransitioning = false; }, 1200);
@@ -124,6 +125,7 @@ export function showMenu({ hasSave, onNewGame, onContinue }) {
 
   div.querySelector('#menu-settings').addEventListener('click', () => {
     audioManager.ensureContext();
+    audioManager.startMenuAmbience();
     audioManager.play('buttonClick');
     _showSettings();
   });
@@ -151,6 +153,7 @@ export function showMenu({ hasSave, onNewGame, onContinue }) {
 
 export function hideMenu() {
   _hideSettings();
+  audioManager.stopMenuAmbience();
   if (_menuElement) {
     _menuElement.remove();
     _menuElement = null;
@@ -185,10 +188,18 @@ function _showSettings() {
             '<label class="settings-toggle"><input type="checkbox" id="settings-sfx" ' + (audioManager.sfxEnabled ? 'checked' : '') + ' /><span class="toggle-track"></span></label>',
           '</div>',
           '<div class="settings-row settings-volume-row">',
-            '<label class="settings-desc" for="settings-volume">Громкость</label>',
+            '<label class="settings-desc" for="settings-volume">Общая громкость эффектов</label>',
             '<input type="range" id="settings-volume" min="0" max="100" value="' + Math.round(audioManager.masterVolume * 100) + '" />',
           '</div>',
-          '<p class="settings-note">Звуковые эффекты генерируются самой игрой. Настройки сохраняются на этом устройстве.</p>',
+          '<div class="settings-row settings-volume-row">',
+            '<label class="settings-desc" for="settings-music-volume">Громкость музыки</label>',
+            '<input type="range" id="settings-music-volume" min="0" max="100" value="' + Math.round(audioManager.musicVolume * 100) + '" />',
+          '</div>',
+          '<div class="settings-row">',
+            '<span class="settings-desc">Атмосфера главного меню</span>',
+            '<label class="settings-toggle"><input type="checkbox" id="settings-music" ' + (audioManager.musicEnabled ? 'checked' : '') + ' /><span class="toggle-track"></span></label>',
+          '</div>',
+          '<p class="settings-note">Музыка и эффекты регулируются отдельно. Звук включается после первого нажатия, как требуют мобильные браузеры.</p>',
         '</div>',
         '<div class="settings-group">',
           '<div class="settings-label">Управление</div>',
@@ -227,6 +238,17 @@ function _showSettings() {
 
   backdrop.querySelector('#settings-volume').addEventListener('input', event => {
     audioManager.setVolume(Number(event.target.value) / 100);
+  });
+
+  backdrop.querySelector('#settings-music-volume').addEventListener('input', event => {
+    audioManager.setMusicVolume(Number(event.target.value) / 100);
+  });
+
+  backdrop.querySelector('#settings-music').addEventListener('change', event => {
+    const enabled = event.target.checked;
+    if (enabled !== audioManager.musicEnabled) audioManager.toggleMusic();
+    if (enabled) audioManager.startMenuAmbience();
+    else audioManager.stopMenuAmbience();
   });
 
   backdrop.querySelector('#settings-joystick').addEventListener('change', event => {
