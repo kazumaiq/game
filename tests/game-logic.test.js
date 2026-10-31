@@ -478,6 +478,27 @@ test('25. Карьерные достижения выплачиваются о�
   assert.equal(gameState.money, beforeSecondWash + 370);
 });
 
+test('27. Сводка здоровья бизнеса считает аренду, материалы, окупаемость и занятость', () => {
+  gameState.initNewGame('roadside');
+  const health = gameState.getBusinessHealth();
+  assert.equal(health.dailyFixed, 6500);
+  assert.equal(health.unlockedPosts, 2);
+  assert.equal(health.totalPosts, 4);
+  assert.equal(health.brokenPosts, 0);
+  assert.equal(health.occupancy, 0);
+  assert.equal(health.washesToBreakEven, 17);
+  assert.equal(health.moneyRunwayDays, Math.floor(gameState.money / 6500));
+  assert.equal(health.health, 'healthy');
+
+  gameState.posts[0].busy = true;
+  gameState.posts[1].broken = true;
+  gameState.money = -100;
+  const stressed = gameState.getBusinessHealth();
+  assert.equal(stressed.occupancy, 0.5);
+  assert.equal(stressed.brokenPosts, 1);
+  assert.equal(stressed.health, 'critical');
+});
+
 test('26. Открытие третьего бокса меняет состояние и платит достижение', () => {
   gameState.initNewGame('roadside');
   const result = gameState.unlockPost('post_3');
