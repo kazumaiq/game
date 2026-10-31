@@ -52,16 +52,24 @@ export function showBusinessPanel() {
   // Сотрудники
   let empHtml = '';
   for (const emp of gameState.employees) {
-    const statusText = emp.status === 'working' ? 'Работает в боксе' : 'Свободен';
-    const statusClass = emp.status === 'working' ? 'working' : '';
+    const busy = emp.status === 'working' || emp.status === 'repairing';
+    const statusText = emp.status === 'working' ? 'Моет автомобиль' : emp.status === 'repairing' ? 'Обслуживает оборудование' : 'Свободен · готов к работе';
+    const statusClass = busy ? 'working' : '';
+    const speed = Math.round((Number(emp.speed) || 0) * 100);
+    const quality = Math.round((Number(emp.quality) || 0) * 100);
     empHtml += `
       <div class="employee-card">
         <div class="employee-info">
           <div class="name">${emp.name}</div>
           <div class="status ${statusClass}">${statusText}</div>
+          <div style="font-size:11px;color:#94a3b8;">Скорость ${speed}% · Качество ${quality}%</div>
           <div style="font-size:11px;color:#94a3b8;">Зарплата: ${fmt(BALANCE.employee.dailySalary)}/день</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+            <button class="game-btn" data-train-emp="${emp.id}" data-skill="speed" ${busy || speed >= 100 || gameState.money < 20000 ? 'disabled' : ''}>⚡ Скорость · 20 000 ₽</button>
+            <button class="game-btn" data-train-emp="${emp.id}" data-skill="quality" ${busy || quality >= 100 || gameState.money < 15000 ? 'disabled' : ''}>✦ Качество · 15 000 ₽</button>
+          </div>
         </div>
-        <button class="game-btn danger" data-fire-emp="${emp.id}" style="font-size:11px;padding:4px 8px;">Уволить</button>
+        <button class="game-btn danger" data-fire-emp="${emp.id}" style="font-size:11px;padding:4px 8px;" ${busy ? 'disabled' : ''}>Уволить</button>
       </div>
     `;
   }
@@ -302,6 +310,22 @@ export function showBusinessPanel() {
       }
     });
   }
+
+  // Обучение сотрудников
+  panel.querySelectorAll('[data-train-emp]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const result = gameState.trainEmployee(btn.dataset.trainEmp, btn.dataset.skill);
+      if (result.success) {
+        audioManager.play('success');
+        showToast(`${result.employee.name}: навык улучшен`, 'success');
+        panel.remove();
+        showBusinessPanel();
+      } else {
+        audioManager.play('error');
+        showToast(result.reason, 'warning');
+      }
+    });
+  });
 
   // Увольнение
   panel.querySelectorAll('[data-fire-emp]').forEach(btn => {
