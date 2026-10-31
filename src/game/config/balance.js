@@ -130,6 +130,8 @@ export const BALANCE = {
     },
   },
 
+  branch: { purchasePrice: 2_400_000, maxBranches: 3, managerSalary: 5_000 },
+
   // Услуги
   services: {
     expressWash: {
