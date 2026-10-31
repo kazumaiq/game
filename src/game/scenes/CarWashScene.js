@@ -1652,6 +1652,10 @@ export default class CarWashScene extends Phaser.Scene {
   _returnEmployeeToRest(emp) {
     const data = this._employeeSprites[emp.id];
     if (!data || !data.sprite || !data.sprite.active) return;
+    data.workTween?.stop();
+    data.workTween = null;
+    data.sprite.setScale(0.5);
+    data.sprite.setAngle(0);
     const rest = this._getEmployeeRestPos(emp.id);
 
     data.sprite.setTexture('employee_walk_2');
@@ -1697,11 +1701,30 @@ export default class CarWashScene extends Phaser.Scene {
 
     const speedMult = gameState.getUpgradeEffect('washSpeed', 1);
     const carClass = BALANCE.carClasses[car.carClass];
+    // Employee service should feel brisk: legacy hires are safely normalized to
+    // the new baseline, while car class and purchased speed upgrades still matter.
+    const effectiveEmployeeSpeed = Math.max(Number(emp.speed) || 0.9, 0.9);
     const totalTime = BALANCE.services.expressWash.baseDuration * stages.length *
-      carClass.timeMultiplier * speedMult / emp.speed;
-
+      carClass.timeMultiplier * speedMult / effectiveEmployeeSpeed;
     const stageTime = totalTime / stages.length;
     let currentStage = 0;
+
+    // Visible work loop: the worker leans into the wash and pulses while water
+    // effects are triggered at each stage. Keep the tween attached to the worker
+    // so it can always be stopped when the task ends or the scene shuts down.
+    if (empData?.sprite?.active) {
+      empData.sprite.setTexture('employee_work');
+      empData.workTween?.stop();
+      empData.workTween = this.tweens.add({
+        targets: empData.sprite,
+        scaleY: { from: 0.48, to: 0.54 },
+        angle: { from: -4, to: 4 },
+        duration: 280,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+    }
 
     const advanceStage = () => {
       if (this._destroyed) return;
