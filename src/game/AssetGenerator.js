@@ -647,31 +647,6 @@ function _generateCharacter(g, key, frame = 0) {
   g.strokeLineShape(new Phaser.Geom.Line(14, 20, 14, 28));
   g.fillStyle(0xffffff, 0.18);
   g.fillCircle(20, 12, 2);
-  // Graphic-novel cel-shading pass: decisive ink silhouette and offset print edge.
-  // Slightly exaggerated shapes stay readable on portrait mobile screens.
-  g.lineStyle(2.4, 0x050711, 0.98);
-  g.strokeRoundedRect(5.5, 5.5, W - 11, H - 11, 10);
-  g.lineStyle(1.2, 0xff4f91, 0.76);
-  g.lineBetween(10, H - 7, W * 0.38, H - 7);
-  g.lineStyle(1.1, 0x62eaff, 0.78);
-  g.lineBetween(W * 0.62, 7, W - 10, 7);
-  // Hard-edged shadow plane and angular reflected-light facets.
-  g.fillStyle(0x050711, 0.28);
-  g.fillTriangle(12, H * 0.62, W * 0.42, H * 0.78, 12, H * 0.84);
-  g.fillStyle(conf.accentColor, state === 'clean' ? 0.24 : 0.12);
-  g.fillTriangle(W * 0.54, 9, W * 0.84, 9, W * 0.72, H * 0.24);
-  g.lineStyle(1, 0xffffff, state === 'clean' ? 0.55 : 0.2);
-  g.lineBetween(W * 0.28, H * 0.18, W * 0.7, H * 0.18);
-  // Sparse halftone dots are clipped visually to the lower body band.
-  for (let row = 0; row < 3; row++) {
-    for (let col = 0; col < 9; col++) {
-      const x = 15 + col * ((W - 30) / 9);
-      const y = H * 0.66 + row * 4;
-      g.fillStyle(state === 'dirty' ? 0x171019 : 0x07101d, 0.24);
-      g.fillCircle(x, y, 0.75);
-    }
-  }
-
   g.generateTexture(key, W * 2, H * 2);
 }
 
