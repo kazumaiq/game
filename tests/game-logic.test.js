@@ -760,3 +760,36 @@ test('Продажа бизнеса корректно отражается в �
   assert.equal(gameState.buyoutAccepted, true);
   assert.equal(gameState.acceptBusinessBuyout().success, false);
 });
+
+test('Филиал открывается отдельно, получает управляющего и ведёт автономную экономику', () => {
+  gameState.initNewGame('roadside');
+  assert.equal(gameState.openBranch('residential').success, false);
+  gameState.competitorAcquired = true;
+  gameState.money = 3_000_000;
+  const result = gameState.openBranch('residential');
+  assert.equal(result.success, true);
+  assert.equal(gameState.money, 600_000);
+  assert.equal(gameState.openBranch('residential').success, false);
+  assert.equal(gameState.assignBranchManager(result.branch.id, 'Иван Петров').success, true);
+  const before = gameState.money;
+  const profit = gameState.settleBranchesDaily();
+  assert.ok(profit > 0);
+  assert.ok(gameState.money > before);
+  assert.equal(result.branch.totalCars, 8);
+  assert.equal(result.branch.suppliesStock, 92);
+  const saved = gameState.serialize();
+  gameState.reset();
+  assert.equal(gameState.deserialize(saved), true);
+  assert.equal(gameState.branches[0].manager, 'Иван Петров');
+  assert.equal(gameState.branches[0].totalCars, 8);
+});
+test('Филиал без управляющего ограничен потоком и складом химии', () => {
+  gameState.initNewGame('roadside');
+  gameState.competitorAcquired = true;
+  gameState.money = 3_000_000;
+  const branch = gameState.openBranch('business').branch;
+  branch.suppliesStock = 2;
+  gameState.settleBranchesDaily();
+  assert.equal(branch.totalCars, 2);
+  assert.equal(branch.suppliesStock, 0);
+});
