@@ -1588,6 +1588,13 @@ export default class CarWashScene extends Phaser.Scene {
     for (const car of gameState.cars) {
       const sprite = this._carSprites[car.id];
       if (!sprite || !sprite.active || sprite.alpha < 0.2) continue;
+      const shadow = this._carShadows[car.id];
+      if (shadow?.active) {
+        shadow.setPosition(sprite.x + 3, sprite.y + Math.max(7, sprite.displayHeight * 0.19));
+        shadow.setScale(sprite.scaleX * 0.98, sprite.scaleY * 0.92);
+        shadow.setDepth(sprite.depth - 0.02);
+        shadow.setAlpha(sprite.alpha * 0.38);
+      }
       const stage = BALANCE.services.expressWash.stages[car.washStage];
       const completed = !!car.completed;
       const wet = completed || stage === 'rinse' || stage === 'finish';
