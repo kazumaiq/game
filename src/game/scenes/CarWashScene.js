@@ -1443,20 +1443,23 @@ export default class CarWashScene extends Phaser.Scene {
 
   _carLeave(carId) {
     const sprite = this._carSprites[carId];
+    const shadow = this._carShadows[carId];
     if (sprite) {
       audioManager.play('carDepart');
       this.tweens.killTweensOf(sprite);
       delete sprite._queueTargetX;
       sprite.setScale(0.5);
       this.tweens.add({
-        targets: sprite,
+        targets: [sprite, shadow].filter(Boolean),
         x: WORLD.exit.x + 80,
         y: WORLD.roadY,
         duration: 1200,
         ease: 'Power2',
         onComplete: () => {
           sprite.destroy();
+          shadow?.destroy();
           delete this._carSprites[carId];
+          delete this._carShadows[carId];
         },
       });
     }
@@ -2534,6 +2537,8 @@ export default class CarWashScene extends Phaser.Scene {
     if (this._equipmentGfx) this._equipmentGfx.destroy();
     if (this._carFinishGfx) this._carFinishGfx.destroy();
     this._carFinishGfx = null;
+    for (const shadow of Object.values(this._carShadows || {})) shadow?.destroy();
+    this._carShadows = {};
     this._equipmentGfx = null;
     this._wetFloorGfx = null;
     if (this._waterMist) this._waterMist.destroy();
