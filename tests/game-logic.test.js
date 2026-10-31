@@ -706,3 +706,57 @@ test('Состояние истории конкурента сохраняет�
   assert.equal(gameState.posts[3].unlocked, true);
   assert.equal(gameState.hasStoryFlag('competitor_acquired'), true);
 });
+
+test('Выкуп точки конкурента атомарно списывает деньги и открывает два исправных бокса', () => {
+  gameState.initNewGame('roadside');
+  const price = BALANCE.competitor.buyoutPrice;
+  gameState.competitorClosed = true;
+  gameState.money = price - 1;
+
+  const rejected = gameState.acquireCompetitorAssets();
+  assert.equal(rejected.success, false);
+  assert.equal(rejected.reason, 'Недостаточно средств');
+  assert.equal(gameState.money, price - 1);
+  assert.equal(gameState.posts[2].unlocked, false);
+  assert.equal(gameState.competitorAcquired, false);
+
+  gameState.money = price + 250_000;
+  gameState.posts[2].broken = true;
+  gameState.posts[2].maintenance = 12;
+  gameState.posts[3].broken = true;
+  gameState.posts[3].maintenance = 0;
+  const expensesBefore = gameState.stats.totalExpenses;
+  const todayExpensesBefore = gameState.stats.todayExpenses;
+
+  const acquired = gameState.acquireCompetitorAssets();
+  assert.equal(acquired.success, true);
+  assert.equal(gameState.money, 250_000);
+  assert.equal(gameState.stats.totalExpenses, expensesBefore + price);
+  assert.equal(gameState.stats.todayExpenses, todayExpensesBefore + price);
+  assert.equal(gameState.competitorAcquired, true);
+  assert.equal(gameState.hasStoryFlag('competitor_acquired'), true);
+  for (const post of gameState.posts.slice(2)) {
+    assert.equal(post.unlocked, true);
+    assert.equal(post.broken, false);
+    assert.equal(post.maintenance, 100);
+    assert.equal(post.busy, false);
+    assert.equal(post.carId, null);
+  }
+  assert.equal(gameState.acquireCompetitorAssets().success, false);
+});
+
+test('Продажа бизнеса корректно отражается в общей и дневной выручке', () => {
+  gameState.initNewGame('roadside');
+  const price = BALANCE.competitor.buyoutPrice;
+  const revenueBefore = gameState.stats.totalRevenue;
+  const todayRevenueBefore = gameState.stats.todayRevenue;
+  const sale = gameState.acceptBusinessBuyout();
+
+  assert.equal(sale.success, true);
+  assert.equal(sale.price, price);
+  assert.equal(gameState.money, 600_000 + price);
+  assert.equal(gameState.stats.totalRevenue, revenueBefore + price);
+  assert.equal(gameState.stats.todayRevenue, todayRevenueBefore + price);
+  assert.equal(gameState.buyoutAccepted, true);
+  assert.equal(gameState.acceptBusinessBuyout().success, false);
+});
