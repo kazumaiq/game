@@ -25,6 +25,9 @@ export function showBusinessPanel() {
   const loc = gameState.getLocation();
   const locName = loc ? loc.name : '—';
   const dailyRent = loc ? loc.dailyRent : 0;
+  const businessHealth = gameState.getBusinessHealth();
+  const healthLabel = businessHealth.health === 'critical' ? 'КРИТИЧНО' : businessHealth.health === 'warning' ? 'НУЖЕН РЕЗЕРВ' : 'СТАБИЛЬНО';
+  const healthColor = businessHealth.health === 'critical' ? '#fb7185' : businessHealth.health === 'warning' ? '#fbbf24' : '#4ade9b';
 
   // Раздел документов
   let docsHtml = '';
@@ -78,6 +81,17 @@ export function showBusinessPanel() {
     <div class="panel" style="max-width:580px;">
       <button class="panel-close" id="business-close">✕</button>
       <h2>Управление бизнесом</h2>
+
+      <section class="business-health-card" aria-label="Состояние бизнеса">
+        <div class="business-health-heading"><div><span>ОПЕРАЦИОННАЯ СВОДКА</span><strong>Здоровье бизнеса</strong></div><b style="color:${healthColor}">${healthLabel}</b></div>
+        <div class="business-health-grid">
+          <div><span>Расходы / день</span><strong>${fmt(businessHealth.dailyFixed)}</strong></div>
+          <div><span>Моек до нуля</span><strong>${businessHealth.washesToBreakEven ?? "—"}</strong></div>
+          <div><span>Запас дней</span><strong>${businessHealth.moneyRunwayDays ?? "—"}</strong></div>
+          <div><span>Боксы заняты</span><strong>${Math.round(businessHealth.occupancy * 100)}%</strong></div>
+        </div>
+        <p>${businessHealth.brokenPosts ? `Не работают боксы: ${businessHealth.brokenPosts}.` : "Все открытые боксы доступны для работы."} Следи за тарифом, зарплатами и загрузкой.</p>
+      </section>
 
       <div class="panel-section">
         <h3>Локация и тариф</h3>
