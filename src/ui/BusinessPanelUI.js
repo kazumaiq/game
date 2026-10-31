@@ -64,6 +64,14 @@ export function showBusinessPanel() {
           <div class="status ${statusClass}">${statusText}</div>
           <div style="font-size:11px;color:#94a3b8;">Скорость ${speed}% · Качество ${quality}%</div>
           <div style="font-size:11px;color:#94a3b8;">Зарплата: ${fmt(BALANCE.employee.dailySalary)}/день</div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#9fb4c9;margin-top:8px;">
+            Специализация
+            <select data-employee-role="${emp.id}" ${busy ? 'disabled' : ''} style="flex:1;min-width:0;background:#0b1a2b;color:#e7f5ff;border:1px solid #31516b;border-radius:9px;padding:8px;">
+              <option value="generalist" ${(emp.role || 'generalist') === 'generalist' ? 'selected' : ''}>Универсал</option>
+              <option value="washer" ${emp.role === 'washer' ? 'selected' : ''}>Мойщик</option>
+              <option value="mechanic" ${emp.role === 'mechanic' ? 'selected' : ''}>Техник</option>
+            </select>
+          </label>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
             <button class="game-btn" data-train-emp="${emp.id}" data-skill="speed" ${busy || speed >= 100 || gameState.money < 20000 ? 'disabled' : ''}>⚡ Скорость · 20 000 ₽</button>
             <button class="game-btn" data-train-emp="${emp.id}" data-skill="quality" ${busy || quality >= 100 || gameState.money < 15000 ? 'disabled' : ''}>✦ Качество · 15 000 ₽</button>
@@ -342,6 +350,23 @@ export function showBusinessPanel() {
       }
     });
   }
+
+  // Специализация сотрудников
+  panel.querySelectorAll('[data-employee-role]').forEach(select => {
+    select.addEventListener('change', () => {
+      const result = gameState.setEmployeeRole(select.dataset.employeeRole, select.value);
+      if (result.success) {
+        audioManager.play('buttonClick');
+        const labels = { generalist: 'Универсал', washer: 'Мойщик', mechanic: 'Техник' };
+        showToast(`${result.employee.name}: роль - ${labels[select.value]}`, 'success');
+      } else {
+        audioManager.play('error');
+        showToast(result.reason, 'warning');
+        panel.remove();
+        showBusinessPanel();
+      }
+    });
+  });
 
   // Обучение сотрудников
   panel.querySelectorAll('[data-train-emp]').forEach(btn => {
