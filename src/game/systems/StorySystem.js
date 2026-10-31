@@ -203,7 +203,7 @@ export class StorySystem {
                 }
                 gameState.money -= price;
                 gameState.stats.totalExpenses += price;
-                gameState.todayExpenses += price;
+                gameState.stats.todayExpenses += price;
                 gameState._logFinance('expense', 'Покупка оборудования «КлинАвто»', price);
                 for (const postId of ['post_3', 'post_4']) {
                   const post = gameState.posts.find(item => item.id === postId);
