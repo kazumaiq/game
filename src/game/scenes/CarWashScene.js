@@ -73,6 +73,9 @@ export default class CarWashScene extends Phaser.Scene {
     this._wetFloorGfx.setBlendMode(Phaser.BlendModes.NORMAL);
     // Animated wash-bay hardware is drawn into one reusable layer; no per-frame sprites.
     this._equipmentGfx = this.add.graphics().setDepth(11.4);
+    // Shared clear-coat pass: one Graphics object for every active vehicle.
+    this._carFinishGfx = this.add.graphics().setDepth(24.4);
+    this._carFinishUpdateTimer = 0;
     this._equipmentAnimTimer = 0;
     this._lastWetPosition = null;
     this._wetFloorUntil = 0;
@@ -1567,6 +1570,39 @@ export default class CarWashScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * A capped-cadence specular pass adds a clear-coat sheen without per-car objects.
+   * Existing textures remain responsible for dirt, foam and rinse state.
+   */
+  _updateCarFinishHighlights(time) {
+    const g = this._carFinishGfx;
+    if (!g || !g.active) return;
+    g.clear();
+
+    for (const car of gameState.cars) {
+      const sprite = this._carSprites[car.id];
+      if (!sprite || !sprite.active || sprite.alpha < 0.2) continue;
+      const stage = BALANCE.services.expressWash.stages[car.washStage];
+      const completed = !!car.completed;
+      const wet = completed || stage === 'rinse' || stage === 'finish';
+      const progress = Math.max(0, Math.min(1, (Number(car.washProgress) || 0) / 100));
+      const sheen = completed ? 0.3 : wet ? 0.13 + progress * 0.1 : 0.045;
+      const width = Math.max(18, sprite.displayWidth * 0.34);
+      const y = sprite.y - Math.max(3, sprite.displayHeight * 0.16);
+      const drift = Math.sin(time * 0.0018 + sprite.x * 0.02) * width * 0.12;
+
+      g.lineStyle(Math.max(1, sprite.displayWidth * 0.012), 0xe8faff, sheen);
+      g.lineBetween(sprite.x - width * 0.38 + drift, y, sprite.x + width * 0.38 + drift, y - 1.5);
+      g.fillStyle(0xc8f5ff, sheen * 0.72);
+      g.fillEllipse(sprite.x - width * 0.18 + drift, y - 3, width * 0.2, 2.2);
+      g.fillEllipse(sprite.x + width * 0.2 + drift, y - 2, width * 0.12, 1.6);
+      if (completed) {
+        g.lineStyle(1, 0x7dd3fc, 0.16);
+        g.lineBetween(sprite.x - width * 0.3, y + 4, sprite.x + width * 0.3, y + 3);
+      }
+    }
+  }
+
   _processQueue() {
     for (let i = 0; i < gameState.posts.length; i++) {
       const post = gameState.posts[i];
@@ -1662,6 +1698,10 @@ export default class CarWashScene extends Phaser.Scene {
       if (!gameState.employees.some(e => e.id === empId)) {
         const data = this._employeeSprites[empId];
         if (data && data.sprite && data.sprite.active) {
+          data.idleTween?.stop();
+          data.workTween?.stop();
+          data.idleTween = null;
+          data.workTween = null;
           data.sprite.setTexture('employee_walk_1');
           if (data.label) data.label.destroy();
           this.tweens.add({
@@ -2015,6 +2055,11 @@ export default class CarWashScene extends Phaser.Scene {
     this._updateActionBtnContext();
     this._updateTargetHighlight(time);
     this._updateSprayEffect(time);
+    this._carFinishUpdateTimer += delta;
+    if (this._carFinishUpdateTimer >= 110) {
+      this._carFinishUpdateTimer = 0;
+      this._updateCarFinishHighlights(time);
+    }
     this._equipmentAnimTimer += delta;
     if (this._equipmentAnimTimer >= 55) {
       this._equipmentAnimTimer = 0;
@@ -2474,6 +2519,8 @@ export default class CarWashScene extends Phaser.Scene {
     }
     if (this._wetFloorGfx) this._wetFloorGfx.destroy();
     if (this._equipmentGfx) this._equipmentGfx.destroy();
+    if (this._carFinishGfx) this._carFinishGfx.destroy();
+    this._carFinishGfx = null;
     this._equipmentGfx = null;
     this._wetFloorGfx = null;
     if (this._waterMist) this._waterMist.destroy();
