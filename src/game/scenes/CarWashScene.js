@@ -1046,6 +1046,21 @@ export default class CarWashScene extends Phaser.Scene {
       return;
     }
 
+    // City Auto Parts is the physical supply counter for the garage.
+    const partsDistance = Phaser.Math.Distance.Between(this.player.x, this.player.y, 84, 256);
+    if (!this._isWashing && partsDistance < 92) {
+      const result = gameState.buySuppliesStock();
+      if (result.success) {
+        audioManager.play('success');
+        this._showCoffeeSteamBurst(84, 250);
+        showToast(`Склад пополнен: +50 комплектов · остаток ${result.newStock}`, 'success');
+      } else {
+        audioManager.play('error');
+        showToast(result.reason, 'warning');
+      }
+      return;
+    }
+
     // Office entrance above the wash bays: open existing business management UI.
     // Reuse the current HUD action so finances/upgrades stay in one source of truth.
     const office = WORLD.building;
