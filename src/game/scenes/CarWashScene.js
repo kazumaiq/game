@@ -71,6 +71,8 @@ export default class CarWashScene extends Phaser.Scene {
     // object is redrawn only while the active wash is running.
     this._wetFloorGfx = this.add.graphics().setDepth(18.6);
     this._wetFloorGfx.setBlendMode(Phaser.BlendModes.NORMAL);
+    this._lastWetPosition = null;
+    this._wetFloorUntil = 0;
 
     // Reusable emitters: continuous mist while the player washes, no per-frame
     // allocation of particle objects. Phaser 3.90 keeps these lightweight.
@@ -2146,6 +2148,18 @@ export default class CarWashScene extends Phaser.Scene {
       if (this._waterMist?.emitting) this._waterMist.stop();
       if (this._foamMist?.emitting) this._foamMist.stop();
       this._activeSprayEmitter = null;
+      if (this._lastWetPosition && (time || 0) < this._wetFloorUntil) {
+        const fade = Phaser.Math.Clamp((this._wetFloorUntil - (time || 0)) / 5200, 0, 1);
+        const wet = this._wetFloorGfx;
+        wet.fillStyle(0x071522, 0.16 * fade);
+        wet.fillEllipse(this._lastWetPosition.x, this._lastWetPosition.y + 5, 100, 25);
+        wet.fillStyle(0x0e7490, 0.13 * fade);
+        wet.fillEllipse(this._lastWetPosition.x - 3, this._lastWetPosition.y + 2, 78, 13);
+        wet.lineStyle(1, 0xb9f3ff, 0.2 * fade);
+        wet.strokeEllipse(this._lastWetPosition.x + 5, this._lastWetPosition.y + 3, 66, 11);
+      } else {
+        this._lastWetPosition = null;
+      }
       return;
     }
 
@@ -2163,6 +2177,8 @@ export default class CarWashScene extends Phaser.Scene {
     const isFoam = currentStage === 'foam';
     const washRatio = Phaser.Math.Clamp((car.washProgress || 0) / 100, 0, 1);
     const wet = this._wetFloorGfx;
+    this._lastWetPosition = { x: sprite.x, y: sprite.y + 18 };
+    this._wetFloorUntil = (time || 0) + 5200;
     if (wet) {
       const floorY = sprite.y + 18;
       const pulseFloor = 0.92 + Math.sin(t * 2.4) * 0.05;
