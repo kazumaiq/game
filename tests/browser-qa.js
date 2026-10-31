@@ -59,20 +59,26 @@ async function runBrowserQA() {
 
   // 2. Запуск Chrome через Puppeteer
   console.log('2. Запуск Chrome (Headless: new, WebGL & Web Audio enabled)...');
-  const browser = await puppeteer.launch({
-    executablePath: CHROME_PATH,
-    headless: 'new',
-    args: [
-      '--use-gl=angle',
-      '--use-angle=d3d11',
-      '--autoplay-policy=no-user-gesture-required',
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-web-security',
-    ],
-  });
-
-  const page = await browser.newPage();
+  let browser;
+  let page;
+  try {
+    browser = await puppeteer.launch({
+      executablePath: CHROME_PATH,
+      headless: 'new',
+      args: [
+        ...(process.platform === 'win32' ? ['--use-gl=angle', '--use-angle=d3d11'] : []),
+        '--autoplay-policy=no-user-gesture-required',
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-web-security',
+      ],
+    });
+    page = await browser.newPage();
+  } catch (error) {
+    if (browser) await browser.close();
+    await server.close();
+    throw error;
+  }
 
   page.on('dialog', async (dialog) => {
     console.log(`[Browser Dialog] ${dialog.type()}: "${dialog.message()}" -> ACCEPT`);
@@ -309,7 +315,7 @@ async function runBrowserQA() {
     results.errors.push(err.toString());
   } finally {
     results.errors.push(...errors);
-    await browser.close();
+    if (browser) await browser.close();
     await server.close();
     console.log('\n=== BROWSER QA ЗАВЕРШЕН ===');
   }
