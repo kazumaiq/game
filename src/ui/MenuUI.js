@@ -98,6 +98,12 @@ export function showMenu({ hasSave, onNewGame, onContinue }) {
   overlay.appendChild(div);
   _menuElement = div;
 
+  // Браузеры блокируют autoplay: запускаем атмосферу при первом реальном касании меню.
+  div.addEventListener('pointerdown', () => {
+    audioManager.ensureContext();
+    audioManager.startMenuAmbience();
+  }, { once: true });
+
   let isTransitioning = false;
   const newGameButton = div.querySelector('#menu-new-game');
   const continueButton = div.querySelector('#menu-continue');
