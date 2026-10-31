@@ -645,3 +645,31 @@ test('32. Нельзя менять роль занятого сотрудник
   assert.equal(result.success, false);
   assert.match(result.reason, /занят/i);
 });
+
+
+test('33. Дополнительные услуги увеличивают выручку и учитывают расход материалов', () => {
+  gameState.initNewGame('roadside');
+  const car = gameState.addCar('sedan');
+  assert.ok(car);
+  const baseNet = gameState.servicePrice - BALANCE.services.expressWash.supplyCost;
+  assert.equal(gameState.toggleExtraService('wax', true).success, true);
+  assert.equal(gameState.toggleExtraService('interior', true).success, true);
+
+  const moneyBefore = gameState.money;
+  const net = gameState.addServiceIncome(car.id, 0.7);
+  assert.equal(net, baseNet + (250 + 450) - (70 + 120));
+  assert.equal(gameState.money, moneyBefore + net);
+  assert.ok(gameState.financialLog.some(item => item.description === 'Мойка Седан'));
+  assert.equal(gameState.selectedExtras.length, 2);
+});
+
+test('34. Каталог дополнительных услуг сохраняется и отклоняет неизвестные позиции', () => {
+  gameState.initNewGame('roadside');
+  assert.equal(gameState.toggleExtraService('polish', true).success, true);
+  assert.equal(gameState.toggleExtraService('unknown', true).success, false);
+
+  const snapshot = gameState.serialize();
+  gameState.reset();
+  assert.equal(gameState.deserialize(snapshot), true);
+  assert.deepEqual(gameState.selectedExtras, ['polish']);
+});
