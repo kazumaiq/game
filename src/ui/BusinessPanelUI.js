@@ -130,6 +130,22 @@ export function showBusinessPanel() {
       </div>
 
       <div class="panel-section">
+        <h3>Техническое обслуживание</h3>
+        <p style="color:#94a3b8;font-size:12px;">После каждой мойки оборудование изнашивается. Профилактика стоит 12 000 ₽ и восстанавливает 35 пунктов ресурса. Изношенные боксы чаще ломаются.</p>
+        ${gameState.posts.filter(post => post.unlocked !== false).map((post, index) => {
+          const condition = Math.max(0, Math.min(100, Math.round(Number.isFinite(post.maintenance) ? post.maintenance : 100)));
+          const color = condition < 35 ? '#fb7185' : condition < 65 ? '#fbbf24' : '#4ade9b';
+          const label = post.broken ? 'Неисправен · нужен ремонт' : post.busy ? 'Сейчас обслуживает автомобиль' : condition < 35 ? 'Критический износ' : condition < 65 ? 'Нужна профилактика' : 'Рабочее состояние';
+          const canService = !post.broken && !post.busy && condition < 100 && gameState.money >= 12000;
+          return '<article class="expansion-card">' +
+            '<div class="expansion-copy"><strong>Бокс ' + (index + 1) + ' · ' + label + '</strong>' +
+            '<div style="height:7px;background:#172538;border-radius:8px;overflow:hidden;margin:8px 0;"><div style="height:100%;width:' + condition + '%;background:' + color + ';border-radius:8px;"></div></div>' +
+            '<small>Ресурс оборудования: ' + condition + '%</small></div>' +
+            (post.broken ? '<span class="expansion-status">РЕМОНТ</span>' : '<button class="game-btn primary" data-service-post="' + post.id + '" ' + (canService ? '' : 'disabled') + '>Профилактика · 12 000 ₽</button>') +
+            '</article>';
+        }).join('')}
+      </div>
+      <div class="panel-section">
         <h3>Документы и проверки надзора</h3>
         <p style="color:#94a3b8;font-size:11px;margin-bottom:8px;">
           Отсутствие документов грозит крупными штрафами во время инспекций СЭС, пожарного надзора и экологии.
@@ -192,6 +208,22 @@ export function showBusinessPanel() {
   });
   panel.addEventListener('click', (e) => {
     if (e.target === panel) panel.remove();
+  });
+
+  // Профилактика оборудования
+  panel.querySelectorAll('[data-service-post]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const result = gameState.servicePost(btn.dataset.servicePost);
+      if (result.success) {
+        audioManager.play('wrenchRepair');
+        showToast('Профилактика завершена · ресурс оборудования восстановлен', 'success');
+        panel.remove();
+        showBusinessPanel();
+      } else {
+        audioManager.play('error');
+        showToast(result.reason, 'warning');
+      }
+    });
   });
 
   // Оформление документов
