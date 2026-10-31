@@ -14,6 +14,7 @@ import { StorySystem } from '../systems/StorySystem.js';
 import { tutorialSystem, TutorialSystem } from '../systems/TutorialSystem.js';
 import { audioManager } from '../systems/AudioManager.js';
 import { getShiftClock, getDayCycleProfile } from '../systems/DayCycle.js';
+import { ThreeWashEnvironment } from '../render/ThreeWashEnvironment.js';
 
 const WORLD = {
   width: 900,
@@ -43,7 +44,12 @@ export default class CarWashScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#0b0e14');
 
     this._createEnvironment();
-    this._createComicBookTreatment();
+    this._threeEnvironment = new ThreeWashEnvironment(this);
+    // Keep the established Phaser gameplay sprites and controls, but replace
+    // the old flat yard artwork with the new real-time 3D environment.
+    for (const object of this.children.list) {
+      if (object !== this.player && Number(object.depth || 0) < 12) object.setVisible(false);
+    }
     this._createPlayer();
     this._setupControls();
 
@@ -155,6 +161,8 @@ export default class CarWashScene extends Phaser.Scene {
     gameState.on('perfectStreakBonus', this._onPerfectStreakBonus);
 
     this.scale.on('resize', this._handleResize, this);
+    this.events.once('shutdown', () => this._threeEnvironment?.dispose());
+    this.events.once('destroy', () => this._threeEnvironment?.dispose());
     this._handleResize({ width: this.scale.width, height: this.scale.height });
 
     this._isCameraFollowingPlayer = false;
