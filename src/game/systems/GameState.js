@@ -101,6 +101,9 @@ class GameState {
     this.competitorPriceWar = false;
     this.buyoutOffered = false;
     this.buyoutAccepted = false;
+    this.competitorBrokenBays = 0;
+    this.competitorClosed = false;
+    this.competitorAcquired = false;
 
     this.settings = {
       soundEnabled: true,
@@ -876,6 +879,9 @@ class GameState {
       competitorPriceWar: this.competitorPriceWar,
       buyoutOffered: this.buyoutOffered,
       buyoutAccepted: this.buyoutAccepted,
+      competitorBrokenBays: this.competitorBrokenBays,
+      competitorClosed: this.competitorClosed,
+      competitorAcquired: this.competitorAcquired,
       settings: { ...this.settings },
       posts: this.posts.map(p => ({ id: p.id, broken: p.broken, unlocked: p.unlocked !== false, maintenance: Number.isFinite(p.maintenance) ? p.maintenance : 100 })),
     };
@@ -932,6 +938,9 @@ class GameState {
     this.competitorPriceWar = !!data.competitorPriceWar;
     this.buyoutOffered = !!data.buyoutOffered;
     this.buyoutAccepted = !!data.buyoutAccepted;
+    this.competitorBrokenBays = Math.max(0, Math.min(2, Number(data.competitorBrokenBays) || 0));
+    this.competitorClosed = !!data.competitorClosed;
+    this.competitorAcquired = !!data.competitorAcquired;
 
     if (data.achievements && typeof data.achievements === 'object') this.achievements = { ...data.achievements };
     this.perfectWashStreak = Math.max(0, Math.floor(Number(data.perfectWashStreak) || 0));
