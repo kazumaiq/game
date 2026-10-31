@@ -673,3 +673,36 @@ test('34. Каталог дополнительных услуг сохраня�
   assert.equal(gameState.deserialize(snapshot), true);
   assert.deepEqual(gameState.selectedExtras, ['polish']);
 });
+
+
+test('Конкурентный демпинг оставляет около 12% базового потока', () => {
+  gameState.initNewGame('roadside');
+  gameState.servicePrice = 500;
+  gameState.reputation = 50;
+  gameState.competitorPriceWar = true;
+  assert.equal(gameState.getDemandMultiplier(), 0.12);
+});
+
+test('Состояние истории конкурента сохраняется и восстанавливается', () => {
+  gameState.initNewGame('roadside');
+  gameState.competitorActive = true;
+  gameState.competitorPriceWar = false;
+  gameState.competitorBrokenBays = 2;
+  gameState.competitorClosed = true;
+  gameState.competitorAcquired = true;
+  gameState.posts[2].unlocked = true;
+  gameState.posts[3].unlocked = true;
+  gameState.setStoryFlag('competitor_acquired');
+
+  const saved = gameState.serialize();
+  gameState.reset();
+  assert.equal(gameState.deserialize(saved), true);
+
+  assert.equal(gameState.competitorActive, true);
+  assert.equal(gameState.competitorBrokenBays, 2);
+  assert.equal(gameState.competitorClosed, true);
+  assert.equal(gameState.competitorAcquired, true);
+  assert.equal(gameState.posts[2].unlocked, true);
+  assert.equal(gameState.posts[3].unlocked, true);
+  assert.equal(gameState.hasStoryFlag('competitor_acquired'), true);
+});
