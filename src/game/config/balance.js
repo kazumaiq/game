@@ -145,7 +145,7 @@ export const BALANCE = {
         rinse: 'Смывание',
         finish: 'Финишная обработка',
       },
-      baseDuration: 3000,
+      baseDuration: 1600,
     },
   },
 
