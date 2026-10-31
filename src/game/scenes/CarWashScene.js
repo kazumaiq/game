@@ -67,6 +67,10 @@ export default class CarWashScene extends Phaser.Scene {
     // Слой струи воды и пены высокого давления
     this._sprayGfx = this.add.graphics();
     this._sprayGfx.setDepth(22);
+    // Wet-floor pass sits below the vehicle and workers; one reusable Graphics
+    // object is redrawn only while the active wash is running.
+    this._wetFloorGfx = this.add.graphics().setDepth(18.6);
+    this._wetFloorGfx.setBlendMode(Phaser.BlendModes.NORMAL);
 
     // Reusable emitters: continuous mist while the player washes, no per-frame
     // allocation of particle objects. Phaser 3.90 keeps these lightweight.
@@ -2135,6 +2139,7 @@ export default class CarWashScene extends Phaser.Scene {
   _updateSprayEffect(time) {
     if (!this._sprayGfx) return;
     this._sprayGfx.clear();
+    this._wetFloorGfx?.clear();
 
     if (!this._isWashing || !this._washingCar) {
       if (this._activeSprayEmitter) this._activeSprayEmitter.stop();
@@ -2156,6 +2161,30 @@ export default class CarWashScene extends Phaser.Scene {
     const targetX = sprite.x + Math.sin(t * 3) * 16;
     const targetY = sprite.y + Math.cos(t * 4) * 8;
     const isFoam = currentStage === 'foam';
+    const washRatio = Phaser.Math.Clamp((car.washProgress || 0) / 100, 0, 1);
+    const wet = this._wetFloorGfx;
+    if (wet) {
+      const floorY = sprite.y + 18;
+      const pulseFloor = 0.92 + Math.sin(t * 2.4) * 0.05;
+      // Irregular shallow puddle with layered cool reflections.
+      wet.fillStyle(0x071522, 0.22);
+      wet.fillEllipse(sprite.x + 2, floorY + 5, 104 * pulseFloor, 27 * pulseFloor);
+      wet.fillStyle(0x0e7490, 0.16 + washRatio * 0.12);
+      wet.fillEllipse(sprite.x - 2, floorY + 3, 88 * pulseFloor, 17 * pulseFloor);
+      wet.fillStyle(0x7dd3fc, 0.14 + washRatio * 0.1);
+      wet.fillEllipse(sprite.x - 10, floorY, 49 * pulseFloor, 5 * pulseFloor);
+      wet.lineStyle(1, 0xcaf4ff, 0.25 + Math.sin(t * 3.2) * 0.08);
+      wet.strokeEllipse(sprite.x + 7, floorY + 3, 70 * pulseFloor, 12 * pulseFloor);
+      // Ripples drift outward from the impact zone, strongest during rinse.
+      if (!isFoam) {
+        for (let i = 0; i < 3; i++) {
+          const phase = (t * 0.65 + i / 3) % 1;
+          const radius = 5 + phase * 19;
+          wet.lineStyle(1, 0xb9f3ff, (1 - phase) * 0.22);
+          wet.strokeEllipse(targetX + (i - 1) * 7, floorY + 1, radius * 2, radius * 0.48);
+        }
+      }
+    }
     const emitter = isFoam ? this._foamMist : this._waterMist;
     const inactive = isFoam ? this._waterMist : this._foamMist;
 
@@ -2306,6 +2335,8 @@ export default class CarWashScene extends Phaser.Scene {
     if (this._sprayGfx) {
       this._sprayGfx.destroy();
     }
+    if (this._wetFloorGfx) this._wetFloorGfx.destroy();
+    this._wetFloorGfx = null;
     if (this._waterMist) this._waterMist.destroy();
     if (this._foamMist) this._foamMist.destroy();
     this._waterMist = null;
