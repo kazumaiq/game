@@ -5,7 +5,7 @@
  <linearGradient id="warm" x2="0" y2="1"><stop stop-color="#fff2b1" stop-opacity=".9"/><stop offset="1" stop-color="#f78a54" stop-opacity=".12"/></linearGradient>
  <linearGradient id="tank" x2="1" y2="0"><stop stop-color="#087cbe"/><stop offset=".5" stop-color="#26b9ed"/><stop offset="1" stop-color="#075d9e"/></linearGradient>
  <filter id="shadow"><feGaussianBlur stdDeviation="6"/></filter>
-</defs>
+<pattern id="inkDots" width="10" height="10" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#b8f7ff" fill-opacity=".45"/></pattern></defs>
 <ellipse cx="282" cy="183" rx="258" ry="10" fill="#030711" fill-opacity=".8" filter="url(#shadow)"/>
 <!-- foundation -->
 <path d="M18 167 35 178 532 178 546 167V185H18Z" fill="#080f1c"/>
@@ -55,4 +55,4 @@
  <rect x="496" y="95" width="34" height="12" rx="3" fill="#071b2d" fill-opacity=".75"/>
  <path d="M500 101h25" stroke="#4bdcf5" stroke-width="2"/>
 </g>
-</svg>
+<path d="M18 167 35 178 532 178 546 167V185H18Z" fill="none" stroke="#050713" stroke-width="4"/><path d="M22 38 78 13H485L538 38V165H22Z" fill="url(#inkDots)" opacity=".2"/><path d="M20 33 78 10H485L540 33" fill="none" stroke="#ff4f91" stroke-width="2.4" opacity=".72"/><path d="M28 42 82 17H481L530 42" fill="none" stroke="#63eaff" stroke-width="2" opacity=".72"/></svg>
