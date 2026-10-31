@@ -72,6 +72,7 @@ class GameState {
     ];
 
     this.servicePrice = BALANCE.services.expressWash.basePrice;
+    this.selectedExtras = [];
 
     this.stats = {
       totalCarsWashed: 0,
@@ -194,17 +195,41 @@ class GameState {
     return { success: true, newStock: this.suppliesStock };
   }
 
+  getExtraServiceCatalog() {
+    return [
+      { id: 'wax', name: 'Жидкий воск', price: 250, cost: 70, description: 'Защита кузова и блеск' },
+      { id: 'interior', name: 'Уборка салона', price: 450, cost: 120, description: 'Пылесос и очистка пластика' },
+      { id: 'polish', name: 'Экспресс-полировка', price: 700, cost: 220, description: 'Блеск лакокрасочного покрытия' },
+    ];
+  }
+
+  toggleExtraService(serviceId, enabled) {
+    const service = this.getExtraServiceCatalog().find(item => item.id === serviceId);
+    if (!service) return { success: false, reason: 'Услуга не найдена' };
+    const selected = new Set(this.selectedExtras || []);
+    if (enabled) selected.add(serviceId);
+    else selected.delete(serviceId);
+    this.selectedExtras = [...selected];
+    this.emit('stateChanged');
+    return { success: true, selectedExtras: [...this.selectedExtras] };
+  }
+
   /** Доход за оказанную услугу */
   addServiceIncome(carId, quality) {
     const car = this.cars.find(c => c.id === carId);
     if (!car || car.paid) return 0;
 
     const carClass = BALANCE.carClasses[car.carClass];
-    const price = Math.round(this.servicePrice * carClass.priceMultiplier);
+    const basePrice = Math.round(this.servicePrice * carClass.priceMultiplier);
+    const extras = this.getExtraServiceCatalog().filter(item => (this.selectedExtras || []).includes(item.id));
+    const extraRevenue = extras.reduce((sum, item) => sum + item.price, 0);
+    const price = basePrice + extraRevenue;
     const supplyCostMult = this.getUpgradeEffect('supplyEfficiency', 1);
-    const supplyCost = Math.round(
+    const baseSupplyCost = Math.round(
       BALANCE.services.expressWash.supplyCost * carClass.supplyCostMultiplier * supplyCostMult
     );
+    const extraSupplyCost = extras.reduce((sum, item) => sum + item.cost, 0);
+    const supplyCost = baseSupplyCost + extraSupplyCost;
 
     this.money += price;
     this.money -= supplyCost;
@@ -835,6 +860,7 @@ class GameState {
       upgrades: { ...this.upgrades },
       employees: this.employees.map(e => ({ ...e })),
       servicePrice: this.servicePrice,
+      selectedExtras: [...(this.selectedExtras || [])],
       stats: { ...this.stats },
       dailyContractDay: this.dailyContractDay,
       dailyContracts: this.dailyContracts.map(contract => ({ ...contract })),
@@ -889,6 +915,8 @@ class GameState {
 
     this.employees = Array.isArray(data.employees) ? data.employees : [];
     this.servicePrice = typeof data.servicePrice === 'number' ? data.servicePrice : BALANCE.services.expressWash.basePrice;
+    const validExtras = new Set(this.getExtraServiceCatalog().map(item => item.id));
+    this.selectedExtras = Array.isArray(data.selectedExtras) ? [...new Set(data.selectedExtras.filter(id => validExtras.has(id)))] : [];
 
     if (data.stats) this.stats = { ...this.stats, ...data.stats };
     if (Array.isArray(data.financialLog)) this.financialLog = data.financialLog;
