@@ -65,10 +65,10 @@ class GameState {
     this.cars = [];
     this.queue = [];
     this.posts = [
-      { id: 'post_1', busy: false, carId: null, broken: false, unlocked: true },
-      { id: 'post_2', busy: false, carId: null, broken: false, unlocked: true },
-      { id: 'post_3', busy: false, carId: null, broken: false, unlocked: false },
-      { id: 'post_4', busy: false, carId: null, broken: false, unlocked: false },
+      { id: 'post_1', busy: false, carId: null, broken: false, unlocked: true, maintenance: 100 },
+      { id: 'post_2', busy: false, carId: null, broken: false, unlocked: true, maintenance: 100 },
+      { id: 'post_3', busy: false, carId: null, broken: false, unlocked: false, maintenance: 100 },
+      { id: 'post_4', busy: false, carId: null, broken: false, unlocked: false, maintenance: 100 },
     ];
 
     this.servicePrice = BALANCE.services.expressWash.basePrice;
@@ -727,6 +727,25 @@ class GameState {
     return true;
   }
 
+  /** Профилактика снижает риск поломки и восстанавливает ресурс оборудования. */
+  servicePost(postId) {
+    const post = this.posts.find(p => p.id === postId);
+    if (!post || post.unlocked === false) return { success: false, reason: 'Бокс недоступен' };
+    if (post.broken) return { success: false, reason: 'Сначала отремонтируй неисправный бокс' };
+    if (post.busy) return { success: false, reason: 'Дождись окончания мойки в этом боксе' };
+    const current = Number.isFinite(post.maintenance) ? post.maintenance : 100;
+    if (current >= 100) return { success: false, reason: 'Оборудование уже обслужено' };
+    const cost = 12_000;
+    if (this.money < cost) return { success: false, reason: 'Недостаточно средств для обслуживания' };
+    post.maintenance = Math.min(100, current + 35);
+    this.money -= cost;
+    this.stats.totalExpenses += cost;
+    this.stats.todayExpenses += cost;
+    this._logFinance('expense', 'Профилактика оборудования · ' + postId.replace('post_', 'бокс '), cost);
+    this.emit('stateChanged');
+    return { success: true, maintenance: post.maintenance, cost };
+  }
+
   repairPost(postId) {
     const post = this.posts.find(p => p.id === postId);
     if (!post || !post.broken) return { success: false, reason: 'Бокс исправен' };
@@ -737,6 +756,7 @@ class GameState {
     this.stats.todayExpenses += cost;
     this._logFinance('expense', `Ремонт бокса`, cost);
     post.broken = false;
+    post.maintenance = 100;
     this.emit('stateChanged');
     return { success: true };
   }
@@ -816,7 +836,7 @@ class GameState {
       buyoutOffered: this.buyoutOffered,
       buyoutAccepted: this.buyoutAccepted,
       settings: { ...this.settings },
-      posts: this.posts.map(p => ({ id: p.id, broken: p.broken, unlocked: p.unlocked !== false })),
+      posts: this.posts.map(p => ({ id: p.id, broken: p.broken, unlocked: p.unlocked !== false, maintenance: Number.isFinite(p.maintenance) ? p.maintenance : 100 })),
     };
   }
 
@@ -881,6 +901,7 @@ class GameState {
           post.broken = !!savedPost.broken;
           // Old saves preserve the original two open bays; expansion bays stay locked.
           if (typeof savedPost.unlocked === 'boolean') post.unlocked = savedPost.unlocked;
+          post.maintenance = Number.isFinite(savedPost.maintenance) ? Math.max(0, Math.min(100, savedPost.maintenance)) : 100;
         }
       }
     }
