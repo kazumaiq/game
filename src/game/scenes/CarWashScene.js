@@ -265,120 +265,242 @@ export default class CarWashScene extends Phaser.Scene {
     }
     if (!gameState.competitorActive) return;
 
+    // A complete rival lot across the road. All elements live in one world-space
+    // group so the rival reads as a place, not a HUD sticker or floating sign.
     const group = this.add.container(0, 0).setDepth(2.2);
     this._competitorGroup = group;
     const g = this.add.graphics();
     group.add(g);
 
-    // Extended street strip and the rival's fenced forecourt, opposite the player.
-    g.fillStyle(0x101722, 1);
+    const closed = gameState.competitorClosed;
+    const opening = gameState.day <= BALANCE.competitor.appearDay;
+    const shell = closed ? 0x1b2633 : 0x17283a;
+    const glass = closed ? 0x101923 : 0x24445a;
+    const orange = 0xff8a3d;
+    const cyan = 0x4bdcf3;
+
+    // Street edge, pedestrian crossing and the deep forecourt.
+    g.fillStyle(0x080e18, 0.92);
     g.fillRect(0, 620, WORLD.width, 200);
-    g.fillStyle(0x252c36, 1);
-    g.fillRect(0, 604, WORLD.width, 28);
-    g.fillStyle(0xd7dce2, 0.72);
-    for (let x = 22; x < 900; x += 76) g.fillRoundedRect(x, 616, 38, 2, 1);
-    g.fillStyle(0x555f6c, 1);
-    g.fillRect(0, 640, WORLD.width, 3);
-
-    // Parking apron, curb and branded building.
-    g.fillStyle(0x080d15, 0.38);
-    g.fillEllipse(450, 760, 760, 90);
-    g.fillStyle(0x586574, 0.95);
-    g.fillRoundedRect(112, 655, 676, 10, 3);
-    g.fillStyle(0x101a27, 1);
-    g.fillRoundedRect(145, 665, 610, 105, 8);
-    g.fillStyle(gameState.competitorClosed ? 0x222832 : 0x25384b, 1);
-    g.fillRoundedRect(154, 671, 592, 89, 5);
-
-    // Three visible service bays, two visibly failed after the story event.
-    for (let i = 0; i < 3; i++) {
-      const x = 190 + i * 190;
-      g.fillStyle(0x050a12, 1);
-      g.fillRoundedRect(x, 690, 150, 56, 4);
-      g.fillStyle(0x30495d, 0.95);
-      g.fillRoundedRect(x + 5, 695, 140, 46, 2);
-      g.fillStyle(0x0b1522, 0.9);
-      g.fillRect(x + 12, 701, 126, 33);
-      g.fillStyle(0xffb84d, 0.75);
-      g.fillRect(x + 8, 687, 134, 3);
-      if (i < gameState.competitorBrokenBays) {
-        g.lineStyle(4, 0xef4444, 0.9);
-        g.lineBetween(x + 18, 704, x + 132, 735);
-        g.lineBetween(x + 132, 704, x + 18, 735);
-        g.fillStyle(0xef4444, 0.92);
-        g.fillRoundedRect(x + 51, 676, 48, 12, 2);
-      }
+    g.fillStyle(0x394553, 1);
+    g.fillRect(0, 602, WORLD.width, 27);
+    g.fillStyle(0x9aa8b5, 0.5);
+    g.fillRect(0, 602, WORLD.width, 2);
+    g.fillStyle(0x0a111b, 1);
+    g.fillRect(0, 629, WORLD.width, 8);
+    for (let x = 24; x < 900; x += 82) {
+      g.fillStyle(0xe7edf4, 0.58);
+      g.fillRoundedRect(x, 610, 42, 3, 1);
     }
+    // Entrance lane markings lead the eye into the competitor's property.
+    g.fillStyle(0xffa24c, 0.72);
+    g.fillRoundedRect(74, 651, 5, 125, 2);
+    g.fillRoundedRect(821, 651, 5, 125, 2);
+    g.fillStyle(0xd6e1eb, 0.22);
+    for (let x = 112; x < 800; x += 86) g.fillRoundedRect(x, 773, 42, 2, 1);
 
-    // Brand fascia and readable sign.
-    g.fillStyle(0x050a12, 0.98);
-    g.fillRoundedRect(315, 645, 270, 31, 5);
-    g.lineStyle(2, 0xf97316, 0.92);
-    g.strokeRoundedRect(315, 645, 270, 31, 5);
-    const title = this.add.text(450, 660, 'КЛИНАВТО', {
-      fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '19px',
-      fontStyle: 'bold', color: gameState.competitorClosed ? '#7f8792' : '#fff1e6',
-      stroke: '#111827', strokeThickness: 4, letterSpacing: 2,
+    // Parking apron and raised architectural plinth.
+    g.fillStyle(0x02060c, 0.42);
+    g.fillEllipse(450, 778, 790, 82);
+    g.fillStyle(0x65798b, 0.96);
+    g.fillRoundedRect(80, 650, 740, 13, 4);
+    g.fillStyle(0x0d1724, 1);
+    g.fillRoundedRect(91, 660, 718, 137, 9);
+    g.fillStyle(shell, 1);
+    g.fillRoundedRect(99, 666, 702, 123, 6);
+    g.lineStyle(2, 0x71899d, 0.7);
+    g.strokeRoundedRect(99, 666, 702, 123, 6);
+    g.fillStyle(0x0b1420, 1);
+    g.fillRoundedRect(111, 676, 678, 102, 4);
+
+    // Roof fascia, layered canopy and light strips matching the cyan/orange
+    // material language of the player's upgraded wash bays.
+    g.fillStyle(0x080e18, 1);
+    g.fillRoundedRect(105, 638, 690, 39, 6);
+    g.fillStyle(0x25394b, 1);
+    g.fillRoundedRect(111, 642, 678, 28, 4);
+    g.fillStyle(orange, closed ? 0.25 : 0.95);
+    g.fillRoundedRect(126, 645, 648, 3, 1);
+    g.fillStyle(cyan, closed ? 0.12 : 0.75);
+    g.fillRoundedRect(126, 650, 648, 1.5, 1);
+    g.fillStyle(0x080e18, 0.98);
+    g.fillRoundedRect(320, 630, 260, 35, 5);
+    g.lineStyle(2, orange, closed ? 0.3 : 0.95);
+    g.strokeRoundedRect(320, 630, 260, 35, 5);
+
+    // Three deep service portals with visible gantries, glass, floor drains,
+    // status lights and equipment silhouettes.
+    const bayCenters = [220, 450, 680];
+    bayCenters.forEach((cx, i) => {
+      const x = cx - 101;
+      const broken = i < gameState.competitorBrokenBays;
+      g.fillStyle(0x030811, 1);
+      g.fillRoundedRect(x, 681, 202, 91, 5);
+      g.fillStyle(0x40566a, 1);
+      g.fillRoundedRect(x + 5, 685, 192, 82, 3);
+      g.fillStyle(closed ? 0x101821 : glass, 1);
+      g.fillRoundedRect(x + 10, 690, 182, 70, 2);
+      g.fillStyle(0x0b1725, 0.88);
+      g.fillRoundedRect(x + 18, 697, 166, 57, 2);
+      // Side pillars and overhead gantry.
+      g.fillStyle(0x8198a9, 0.85);
+      g.fillRoundedRect(x + 7, 685, 7, 81, 2);
+      g.fillRoundedRect(x + 188, 685, 7, 81, 2);
+      g.fillStyle(0x17293a, 1);
+      g.fillRoundedRect(x + 21, 688, 160, 7, 2);
+      g.fillStyle(broken ? 0xef5350 : cyan, closed ? 0.12 : 0.9);
+      g.fillRoundedRect(x + 25, 689, 152, 2, 1);
+      // Twin vertical wash rails and ceiling nozzles.
+      g.fillStyle(0x9db6c6, 0.62);
+      g.fillRoundedRect(x + 29, 704, 4, 42, 2);
+      g.fillRoundedRect(x + 169, 704, 4, 42, 2);
+      g.fillStyle(0xffbd68, 0.82);
+      for (let n = 0; n < 5; n++) g.fillCircle(x + 48 + n * 26, 702, 1.7);
+      // Wet floor and drainage grates.
+      g.fillStyle(0x3b7183, 0.34);
+      g.fillRoundedRect(x + 22, 747, 158, 5, 2);
+      g.fillStyle(0x7e9aa9, 0.55);
+      for (let n = 0; n < 9; n++) g.fillRect(x + 32 + n * 16, 755, 2, 7);
+      // Bay number and operating state.
+      g.fillStyle(broken ? 0x61252b : 0x102a36, 1);
+      g.fillRoundedRect(x + 78, 674, 46, 12, 3);
+      g.fillStyle(broken ? 0xff6565 : 0x6af0d2, 1);
+      g.fillCircle(x + 86, 680, 2);
+      if (broken) {
+        g.lineStyle(4, 0xff5555, 0.94);
+        g.lineBetween(x + 29, 699, x + 173, 750);
+        g.lineBetween(x + 173, 699, x + 29, 750);
+        g.fillStyle(0x8b1e2a, 0.96);
+        g.fillRoundedRect(cx - 31, 712, 62, 18, 4);
+        const repair = this.add.text(cx, 721, 'НЕ РАБОТАЕТ', {
+          fontFamily: 'Arial, sans-serif', fontSize: '7px', fontStyle: 'bold',
+          color: '#ffe1e1', letterSpacing: 0.7,
+        }).setOrigin(0.5);
+        group.add(repair);
+      }
+    });
+
+    // Large, legible illuminated brand sign with a separate network badge.
+    const title = this.add.text(450, 647, 'КЛИНАВТО', {
+      fontFamily: 'Arial, Helvetica, sans-serif',
+      fontSize: '22px', fontStyle: 'bold',
+      color: closed ? '#8995a3' : '#fff3e8',
+      stroke: '#09111b', strokeThickness: 5,
+      letterSpacing: 3,
+      shadow: { offsetX: 0, offsetY: 0, color: closed ? '#64748b' : '#ff873f', blur: 12, fill: true },
     }).setOrigin(0.5);
     group.add(title);
-    const subtitle = this.add.text(450, 680, gameState.competitorClosed
-      ? 'ФИЛИАЛ ЗАКРЫТ' : '47 АВТОМОЕК · МОЙКА ОТ 100 ₽', {
+    const subtitle = this.add.text(450, 665, closed
+      ? 'ФИЛИАЛ ЗАКРЫТ' : '47 ФИЛИАЛОВ  •  ЭКСПРЕСС-МОЙКА ОТ 100 ₽', {
       fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '8px',
-      fontStyle: 'bold', color: gameState.competitorClosed ? '#f87171' : '#fdba74',
-      letterSpacing: 1,
+      fontStyle: 'bold', color: closed ? '#f87171' : '#ffc18b',
+      letterSpacing: 1.1,
     }).setOrigin(0.5);
     group.add(subtitle);
 
-    // Customer cars and a small opening-day crowd make the rival feel occupied.
-    if (!gameState.competitorClosed) {
-      const carColors = [0x64748b, 0xcbd5e1, 0x9f1239];
-      for (let i = 0; i < 3; i++) {
-        const x = 245 + i * 205;
-        g.fillStyle(0x03060b, 0.55);
-        g.fillEllipse(x, 788, 78, 15);
-        g.fillStyle(carColors[i], 1);
-        g.fillRoundedRect(x - 31, 766, 62, 20, 6);
+    // Working cars use detailed layered silhouettes and animated head/tail lamps.
+    const drawRivalCar = (cx, cy, color, scale = 1) => {
+      const car = this.add.container(cx, cy);
+      group.add(car);
+      const body = this.add.graphics();
+      car.add(body);
+      body.fillStyle(0x02050a, 0.48);
+      body.fillEllipse(0, 14 * scale, 92 * scale, 24 * scale);
+      body.fillStyle(0x050a12, 1);
+      body.fillRoundedRect(-43 * scale, -4 * scale, 86 * scale, 30 * scale, 9 * scale);
+      body.fillStyle(color, 1);
+      body.fillRoundedRect(-40 * scale, -11 * scale, 80 * scale, 28 * scale, 8 * scale);
+      body.fillStyle(0xffffff, 0.18);
+      body.fillRoundedRect(-34 * scale, -9 * scale, 68 * scale, 3 * scale, 1);
+      body.fillStyle(0x12283a, 1);
+      body.fillRoundedRect(-22 * scale, -21 * scale, 44 * scale, 20 * scale, 7 * scale);
+      body.fillStyle(0x8fd7ed, 0.9);
+      body.fillRoundedRect(-17 * scale, -18 * scale, 34 * scale, 13 * scale, 4 * scale);
+      body.fillStyle(0x142333, 1);
+      body.fillRect(-1 * scale, -18 * scale, 2 * scale, 13 * scale);
+      body.fillStyle(0x0a0f17, 1);
+      body.fillRoundedRect(-34 * scale, 10 * scale, 15 * scale, 8 * scale, 3 * scale);
+      body.fillRoundedRect(19 * scale, 10 * scale, 15 * scale, 8 * scale, 3 * scale);
+      body.fillStyle(0xe8f5ff, 0.9);
+      body.fillRoundedRect(-37 * scale, -2 * scale, 7 * scale, 4 * scale, 2);
+      body.fillRoundedRect(30 * scale, -2 * scale, 7 * scale, 4 * scale, 2);
+      body.fillStyle(0xff6a4d, 0.95);
+      body.fillRoundedRect(-37 * scale, 8 * scale, 5 * scale, 4 * scale, 1);
+      body.fillRoundedRect(32 * scale, 8 * scale, 5 * scale, 4 * scale, 1);
+      return car;
+    };
+
+    if (!closed) {
+      const cars = [
+        drawRivalCar(205, 787, 0x2b8caa, 0.83),
+        drawRivalCar(450, 787, 0xc7d2dc, 0.83),
+        drawRivalCar(695, 787, 0x9a4268, 0.83),
+      ];
+      cars.forEach((car, i) => {
+        this.tweens.add({
+          targets: car, y: car.y - 2, duration: 1050 + i * 170,
+          yoyo: true, repeat: -1, ease: 'Sine.inOut',
+        });
+      });
+
+      // Staff and customers are full little silhouettes, not dots. The opening
+      // day has a crowd, while normal days retain a few visible workers.
+      for (let i = 0; i < (opening ? 12 : 6); i++) {
+        const x = 145 + i * (opening ? 55 : 110);
+        const y = 672 + (i % 2) * 12;
+        g.fillStyle(0x02060d, 0.38);
+        g.fillEllipse(x, y + 19, 13, 5);
+        g.fillStyle(i % 3 === 0 ? 0xffa24c : 0x7ed8e8, 1);
+        g.fillRoundedRect(x - 4, y + 5, 8, 12, 3);
+        g.fillStyle(0xf1c9aa, 1);
+        g.fillCircle(x, y + 2, 4);
         g.fillStyle(0x172638, 1);
-        g.fillRoundedRect(x - 17, 758, 34, 13, 4);
-        g.fillStyle(0x9bdcf3, 0.8);
-        g.fillRoundedRect(x - 13, 760, 26, 8, 2);
-        for (const wx of [x - 20, x + 20]) {
-          g.fillStyle(0x05070b, 1);
-          g.fillCircle(wx, 785, 5);
-        }
+        g.fillRect(x - 3, y + 15, 2, 6);
+        g.fillRect(x + 1, y + 15, 2, 6);
       }
-      for (let i = 0; i < 14; i++) {
-        const x = 270 + (i % 7) * 60;
-        const y = 650 + Math.floor(i / 7) * 13;
-        g.fillStyle(i % 3 === 0 ? 0xfbbf24 : 0xdbeafe, 0.9);
-        g.fillCircle(x, y, 3.2);
-        g.fillStyle(0x334155, 1);
-        g.fillRoundedRect(x - 2.5, y + 3, 5, 8, 2);
-      }
-      // DJ stage and paired moving beams are present on the opening day.
-      if (gameState.day <= BALANCE.competitor.appearDay) {
-        g.fillStyle(0x090d18, 0.98);
-        g.fillRoundedRect(395, 625, 110, 18, 3);
-        g.fillStyle(0xf472b6, 0.9);
-        g.fillRect(405, 628, 90, 2);
-        for (const x of [420, 480]) {
-          const beam = this.add.rectangle(x, 620, 3, 52, 0xf472b6, 0.42).setOrigin(0.5, 0);
-          group.add(beam);
-          this.tweens.add({ targets: beam, angle: { from: -24, to: 24 }, alpha: { from: 0.2, to: 0.65 }, duration: 850, yoyo: true, repeat: -1 });
+
+      // Opening-day stage, speaker stacks and animated spotlights.
+      if (opening) {
+        g.fillStyle(0x080d18, 1);
+        g.fillRoundedRect(380, 615, 140, 23, 4);
+        g.lineStyle(2, 0xf472b6, 0.9);
+        g.strokeRoundedRect(380, 615, 140, 23, 4);
+        for (const x of [392, 508]) {
+          g.fillStyle(0x172438, 1);
+          g.fillRoundedRect(x, 600, 12, 29, 3);
+          g.lineStyle(2, 0x38bdf8, 0.85);
+          g.strokeCircle(x + 6, 609, 3);
+          g.strokeCircle(x + 6, 620, 3);
         }
+        const beamA = this.add.rectangle(420, 612, 4, 58, 0xf472b6, 0.35).setOrigin(0.5, 0);
+        const beamB = this.add.rectangle(480, 612, 4, 58, 0x38bdf8, 0.35).setOrigin(0.5, 0);
+        group.add([beamA, beamB]);
+        [beamA, beamB].forEach((beam, i) => this.tweens.add({
+          targets: beam, angle: { from: i ? 22 : -22, to: i ? -22 : 22 },
+          alpha: { from: 0.2, to: 0.58 }, duration: 900 + i * 180,
+          yoyo: true, repeat: -1,
+        }));
       }
     } else {
-      g.fillStyle(0x02050a, 0.38);
-      g.fillRoundedRect(154, 671, 592, 89, 5);
+      g.fillStyle(0x02050a, 0.54);
+      g.fillRoundedRect(111, 676, 678, 102, 4);
+      g.fillStyle(0x7f1d1d, 0.78);
+      g.fillRoundedRect(356, 704, 188, 28, 5);
+      const closedSign = this.add.text(450, 718, 'ОБЪЕКТ ОПЕЧАТАН', {
+        fontFamily: 'Arial, sans-serif', fontSize: '11px', fontStyle: 'bold',
+        color: '#fecaca', letterSpacing: 1.4,
+      }).setOrigin(0.5);
+      group.add(closedSign);
     }
 
+    // Player-owned takeover gets a clear new brand treatment, not a hidden flag.
     if (gameState.competitorAcquired) {
-      const acquired = this.add.text(450, 800, 'ВАША ВТОРАЯ ЛОКАЦИЯ', {
+      const takeover = this.add.text(450, 806, 'ВАША ВТОРАЯ ЛОКАЦИЯ', {
         fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '11px',
         fontStyle: 'bold', color: '#86efac', backgroundColor: '#07140f',
-        padding: { x: 9, y: 5 },
+        padding: { x: 10, y: 6 }, letterSpacing: 1,
       }).setOrigin(0.5);
-      group.add(acquired);
+      group.add(takeover);
     }
   }
 
