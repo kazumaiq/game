@@ -619,3 +619,29 @@ test('30. Профилактика не обслуживает неисправ�
   post.broken = true;
   assert.equal(gameState.servicePost(post.id).success, false);
 });
+
+
+test('31. Специализация сотрудника управляет ролью и сохраняется в сохранении', () => {
+  gameState.initNewGame('roadside');
+  const hired = gameState.hireEmployee();
+  assert.equal(hired.success, true);
+  const emp = hired.employee;
+
+  assert.equal(gameState.setEmployeeRole(emp.id, 'mechanic').success, true);
+  assert.equal(emp.role, 'mechanic');
+
+  const saved = gameState.serialize();
+  gameState.reset();
+  assert.equal(gameState.deserialize(saved), true);
+  assert.equal(gameState.employees[0].role, 'mechanic');
+});
+
+test('32. Нельзя менять роль занятого сотрудника или назначать неизвестную роль', () => {
+  gameState.initNewGame('roadside');
+  const emp = gameState.hireEmployee().employee;
+  assert.equal(gameState.setEmployeeRole(emp.id, 'driver').success, false);
+  emp.status = 'working';
+  const result = gameState.setEmployeeRole(emp.id, 'washer');
+  assert.equal(result.success, false);
+  assert.match(result.reason, /занят/i);
+});
