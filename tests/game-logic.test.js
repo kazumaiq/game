@@ -478,6 +478,18 @@ test('25. Карьерные достижения выплачиваются о�
   assert.equal(gameState.money, beforeSecondWash + 370);
 });
 
+test('28. Окупаемость учитывает средний расход химии по парку и улучшения', () => {
+  gameState.initNewGame('roadside');
+  const baseCost = gameState.getAverageSupplyCost();
+  assert.ok(baseCost > BALANCE.services.expressWash.supplyCost);
+  assert.ok(baseCost < BALANCE.services.expressWash.supplyCost * 1.3);
+  gameState.upgrades.supplyEfficiency = 1;
+  const upgradedCost = gameState.getAverageSupplyCost();
+  assert.ok(upgradedCost < baseCost);
+  const health = gameState.getBusinessHealth();
+  assert.ok(health.washesToBreakEven > 0);
+});
+
 test('27. Сводка здоровья бизнеса считает аренду, материалы, окупаемость и занятость', () => {
   gameState.initNewGame('roadside');
   const health = gameState.getBusinessHealth();
@@ -486,7 +498,7 @@ test('27. Сводка здоровья бизнеса считает аренд
   assert.equal(health.totalPosts, 4);
   assert.equal(health.brokenPosts, 0);
   assert.equal(health.occupancy, 0);
-  assert.equal(health.washesToBreakEven, 17);
+  assert.equal(health.washesToBreakEven, 18);
   assert.equal(health.moneyRunwayDays, Math.floor(gameState.money / 6500));
   assert.equal(health.health, 'healthy');
 
