@@ -564,3 +564,24 @@ test('24. Суточный цикл усиливает освещение пос
   assert.ok(evening.lampAlpha > sunset.lampAlpha);
   assert.equal(evening.phase, 'evening');
 });
+
+
+test('25. Обучение сотрудника повышает навык, списывает деньги и блокируется во время работы', () => {
+  gameState.initNewGame('roadside');
+  const hired = gameState.hireEmployee();
+  assert.equal(hired.success, true);
+  const employee = hired.employee;
+  const initialSpeed = employee.speed;
+  const initialMoney = gameState.money;
+
+  const trained = gameState.trainEmployee(employee.id, 'speed');
+  assert.equal(trained.success, true);
+  assert.equal(employee.speed, Math.min(1, Math.round((initialSpeed + 0.05) * 100) / 100));
+  assert.equal(gameState.money, initialMoney - 20_000);
+
+  employee.status = 'working';
+  const blocked = gameState.trainEmployee(employee.id, 'quality');
+  assert.equal(blocked.success, false);
+  assert.match(blocked.reason, /занят/i);
+  assert.equal(employee.quality, BALANCE.employee.baseQuality);
+});
