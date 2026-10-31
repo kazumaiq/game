@@ -231,6 +231,9 @@ class AudioManager {
       try {
         this._activeSpray.filter.frequency.setTargetAtTime(freq, this.ctx.currentTime, 0.08);
         this._activeSpray.filter.Q.setTargetAtTime(q, this.ctx.currentTime, 0.08);
+        if (this._activeSpray.airGain) {
+          this._activeSpray.airGain.gain.setTargetAtTime(type === 'foam' ? 0.018 : 0.052, this.ctx.currentTime, 0.1);
+        }
       } catch (e) {}
       return;
     }
@@ -253,16 +256,33 @@ class AudioManager {
       filter.Q.setValueAtTime(q, this.ctx.currentTime);
 
       const gain = this.ctx.createGain();
+      const airFilter = this.ctx.createBiquadFilter();
+      airFilter.type = 'highpass';
+      airFilter.frequency.setValueAtTime(2200, this.ctx.currentTime);
+      const airGain = this.ctx.createGain();
+      const pressureOsc = this.ctx.createOscillator();
+      const pressureGain = this.ctx.createGain();
       const t = this.ctx.currentTime;
       gain.gain.setValueAtTime(0.001, t);
-      gain.gain.linearRampToValueAtTime(0.25, t + 0.06);
+      gain.gain.linearRampToValueAtTime(0.22, t + 0.06);
+      airGain.gain.setValueAtTime(type === 'foam' ? 0.018 : 0.052, t);
+      pressureOsc.type = 'triangle';
+      pressureOsc.frequency.setValueAtTime(type === 'foam' ? 48 : 64, t);
+      pressureGain.gain.setValueAtTime(0.0001, t);
+      pressureGain.gain.linearRampToValueAtTime(0.018, t + 0.12);
 
       noise.connect(filter);
       filter.connect(gain);
       gain.connect(this.masterGain);
+      noise.connect(airFilter);
+      airFilter.connect(airGain);
+      airGain.connect(this.masterGain);
+      pressureOsc.connect(pressureGain);
+      pressureGain.connect(this.masterGain);
 
       noise.start(t);
-      this._activeSpray = { noise, filter, gain };
+      pressureOsc.start(t);
+      this._activeSpray = { noise, filter, gain, airGain, pressureOsc, pressureGain };
     } catch (e) {}
   }
 
@@ -270,13 +290,22 @@ class AudioManager {
   stopSpray() {
     if (!this._activeSpray || !this.ctx) return;
     try {
-      const { noise, gain } = this._activeSpray;
+      const { noise, gain, airGain, pressureOsc, pressureGain } = this._activeSpray;
       const t = this.ctx.currentTime;
       gain.gain.setValueAtTime(gain.gain.value, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      if (airGain) {
+        airGain.gain.setValueAtTime(airGain.gain.value, t);
+        airGain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      }
+      if (pressureGain) {
+        pressureGain.gain.setValueAtTime(pressureGain.gain.value, t);
+        pressureGain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      }
       setTimeout(() => {
         try { noise.stop(); } catch (e) {}
-      }, 100);
+        try { pressureOsc?.stop(); } catch (e) {}
+      }, 140);
     } catch (e) {}
     this._activeSpray = null;
   }
