@@ -167,6 +167,18 @@ export function showBusinessPanel() {
             '</article>';
         }).join('')}
       </div>
+
+      <div class="panel-section">
+        <h3>Сеть филиалов</h3>
+        <p style="color:#94a3b8;font-size:12px;">Филиалы работают автономно. В конце смены они обслуживают клиентов и оплачивают аренду, коммунальные расходы и материалы. Управляющий повышает пропускную способность, его зарплата 5 000 ₽/день.</p>
+        ${gameState.branches.map(b => {
+          const loc = BALANCE.locations[b.locationId];
+          return '<article class="expansion-card"><div class="expansion-copy"><strong>' + b.name + '</strong><span>' + (b.manager || 'Управляющий не назначен') + ' · ' + b.bays + ' бокса</span><small>Машин: ' + b.totalCars + ' · химия: ' + b.suppliesStock + ' · прибыль за смену: ' + fmt(b.lastDayProfit) + '</small><small>Выручка: ' + fmt(b.totalRevenue) + ' · расходы: ' + fmt(b.totalExpenses) + ' · аренда: ' + fmt(loc.dailyRent) + '/день</small><input data-branch-manager="' + b.id + '" value="' + b.manager.replace(/"/g, '&quot;') + '" maxlength="40" placeholder="Имя управляющего" style="width:100%;margin-top:8px;background:#0b1a2b;color:#e7f5ff;border:1px solid #31516b;border-radius:9px;padding:9px;"><button class="game-btn" data-save-branch-manager="' + b.id + '" style="margin-top:6px;">Назначить управляющего</button></div></article>';
+        }).join('') || '<p style="color:#94a3b8;font-size:12px;">Дополнительных филиалов пока нет.</p>'}
+        ${Object.values(BALANCE.locations).filter(loc => !gameState.branches.some(b => b.locationId === loc.id)).map(loc => '<article class="expansion-card"><div class="expansion-copy"><strong>' + loc.name + '</strong><span>' + loc.description + '</span><small>2 бокса · стартовый склад 100 комплектов</small></div><button class="game-btn primary" data-open-branch="' + loc.id + '" ' + (gameState.competitorAcquired && gameState.money >= BALANCE.branch.purchasePrice && gameState.branches.length < BALANCE.branch.maxBranches ? '' : 'disabled') + '>Открыть · ' + fmt(BALANCE.branch.purchasePrice) + '</button></article>').join('')}
+        <small style="color:#94a3b8;">До 3 дополнительных точек. Открытие доступно после выкупа активов «КлинАвто».</small>
+      </div>
+
       <div class="panel-section">
         <h3>Документы и проверки надзора</h3>
         <p style="color:#94a3b8;font-size:11px;margin-bottom:8px;">
@@ -295,6 +307,19 @@ export function showBusinessPanel() {
       }
     });
   });
+
+
+  panel.querySelectorAll('[data-open-branch]').forEach(btn => btn.addEventListener('click', () => {
+    const result = gameState.openBranch(btn.dataset.openBranch);
+    if (result.success) { showToast('Филиал открыт: ' + result.branch.name, 'success'); panel.remove(); showBusinessPanel(); }
+    else showToast(result.reason, 'warning');
+  }));
+  panel.querySelectorAll('[data-save-branch-manager]').forEach(btn => btn.addEventListener('click', () => {
+    const input = panel.querySelector('[data-branch-manager="' + btn.dataset.saveBranchManager + '"]');
+    const result = gameState.assignBranchManager(btn.dataset.saveBranchManager, input?.value);
+    if (result.success) { showToast('Управляющий назначен · 5 000 ₽/день', 'success'); panel.remove(); showBusinessPanel(); }
+    else showToast(result.reason, 'warning');
+  }));
 
   // Цена
   document.getElementById('price-down').addEventListener('click', () => {
