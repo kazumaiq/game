@@ -41,7 +41,7 @@ export default class CarWashScene extends Phaser.Scene {
 
   create() {
     this._destroyed = false;
-    this.cameras.main.setBackgroundColor('#0b0e14');
+    this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
 
     this._createEnvironment();
     this._threeEnvironment = new ThreeWashEnvironment(this);
