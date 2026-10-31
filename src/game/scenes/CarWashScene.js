@@ -1298,8 +1298,15 @@ export default class CarWashScene extends Phaser.Scene {
 
   _checkBreakdown(postId) {
     if (!postId) return;
+    const post = gameState.posts.find(item => item.id === postId);
+    if (!post) return;
+    // Equipment wears down after every completed wash. Preventive service
+    // restores condition and materially lowers the chance of an emergency stop.
+    post.maintenance = Math.max(0, (Number.isFinite(post.maintenance) ? post.maintenance : 100) - 8);
     const reliabilityMult = gameState.getUpgradeEffect('reliability', 1);
-    const chance = BALANCE.breakdown.baseChancePerWash * reliabilityMult;
+    const wearPenalty = 1 + ((100 - post.maintenance) / 100) * 2.5;
+    const chance = BALANCE.breakdown.baseChancePerWash * reliabilityMult * wearPenalty;
+    gameState.emit('stateChanged');
     if (Math.random() < chance) {
       const idx = gameState.posts.findIndex(p => p.id === postId);
       if (idx !== -1) {
