@@ -42,6 +42,8 @@ export default class CarWashScene extends Phaser.Scene {
   create() {
     this._destroyed = false;
     this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
+    // WebGL clear must preserve alpha so the Three.js world behind Phaser is visible.
+    if (this.game.renderer?.gl) this.game.renderer.gl.clearColor(0, 0, 0, 0);
 
     this._createEnvironment();
     this._threeEnvironment = new ThreeWashEnvironment(this);
