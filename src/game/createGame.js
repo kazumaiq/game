@@ -5,9 +5,12 @@ import LocationSelectScene from './scenes/LocationSelectScene.js';
 import CarWashScene from './scenes/CarWashScene.js';
 
 export function createGame() {
-  // Cap the internal render resolution at 2x on high-DPI phones. Rendering a 3x
-  // canvas can quadruple pixel work versus 1.5x and cause heat/FPS drops in Safari.
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  // Mobile GPUs pay a steep fill-rate cost at Retina resolutions. Keep phones
+  // at 1.5x (about 44% fewer internal pixels than 2x) while preserving 2x on
+  // larger desktop displays. This affects render resolution, not CSS layout size.
+  const isMobile = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 768;
+  const maxDpr = isMobile ? 1.5 : 2;
+  const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
 
   const config = {
     type: Phaser.AUTO,
