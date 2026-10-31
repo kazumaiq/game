@@ -428,6 +428,21 @@ class GameState {
     return { success: true, employee: emp };
   }
 
+  /** Назначить специализацию сотрудника: универсал, мойщик или техник. */
+  setEmployeeRole(empId, role) {
+    const emp = this.employees.find(item => item.id === empId);
+    if (!emp) return { success: false, reason: 'Сотрудник не найден' };
+    if (!['generalist', 'washer', 'mechanic'].includes(role)) {
+      return { success: false, reason: 'Неизвестная специализация' };
+    }
+    if (emp.status === 'working' || emp.status === 'repairing') {
+      return { success: false, reason: 'Сотрудник занят. Назначение изменится после завершения задачи.' };
+    }
+    emp.role = role;
+    this.emit('stateChanged');
+    return { success: true, employee: emp };
+  }
+
   /** Обучить сотрудника: повысить скорость или качество обслуживания. */
   trainEmployee(empId, skill) {
     const emp = this.employees.find(item => item.id === empId);
