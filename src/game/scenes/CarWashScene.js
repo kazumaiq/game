@@ -1496,15 +1496,20 @@ export default class CarWashScene extends Phaser.Scene {
     const targetY = WORLD.queueStart.y;
 
     const sprite = this.add.image(WORLD.entrance.x - 30, WORLD.entrance.y, `car_${classId}_dirty`);
-    sprite.setScale(0.5);
+    sprite.setScale(0.44).setAlpha(0.82);
     sprite.setDepth(12 + WORLD.entrance.y * 0.01);
     sprite._queueTargetX = targetX;
+    const shadow = this.add.ellipse(sprite.x + 3, sprite.y + 9, 72, 27, 0x02050b, 0.36)
+      .setScale(0.44).setDepth(sprite.depth - 0.02);
     this._carSprites[car.id] = sprite;
+    this._carShadows[car.id] = shadow;
 
     this.tweens.add({
-      targets: sprite,
+      targets: [sprite, shadow],
       x: targetX,
       y: targetY,
+      scale: 0.5,
+      alpha: 1,
       duration: 1100,
       ease: 'Power2',
       onComplete: () => {
