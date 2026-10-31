@@ -428,6 +428,46 @@ class GameState {
     return { success: true, postId, price };
   }
 
+  /** Продажа бизнеса по сюжетному предложению конкурента. */
+  acceptBusinessBuyout() {
+    if (this.buyoutAccepted) return { success: false, reason: 'Предложение уже принято' };
+    const price = BALANCE.competitor.buyoutPrice;
+    this.buyoutAccepted = true;
+    this.money += price;
+    this.stats.totalRevenue += price;
+    this.stats.todayRevenue += price;
+    this._logFinance('income', 'Продажа бизнеса «КлинАвто»', price);
+    this.emit('stateChanged');
+    return { success: true, price, balance: this.money };
+  }
+
+  /** Выкуп закрывшейся точки конкурента и восстановление двух постов. */
+  acquireCompetitorAssets() {
+    const price = BALANCE.competitor.buyoutPrice;
+    if (this.competitorAcquired) return { success: false, reason: 'Точка уже приобретена' };
+    if (!this.competitorClosed) return { success: false, reason: 'Точка конкурента ещё не закрыта' };
+    if (this.money < price) return { success: false, reason: 'Недостаточно средств', missing: price - this.money };
+
+    const expansionPosts = ['post_3', 'post_4'].map(id => this.posts.find(post => post.id === id));
+    if (expansionPosts.some(post => !post)) return { success: false, reason: 'Не удалось найти дополнительные боксы' };
+
+    this.money -= price;
+    this.stats.totalExpenses += price;
+    this.stats.todayExpenses += price;
+    this._logFinance('expense', 'Покупка оборудования «КлинАвто»', price);
+    for (const post of expansionPosts) {
+      post.unlocked = true;
+      post.broken = false;
+      post.busy = false;
+      post.carId = null;
+      post.maintenance = 100;
+    }
+    this.competitorAcquired = true;
+    this.setStoryFlag('competitor_acquired');
+    this.emit('stateChanged');
+    return { success: true, price, unlockedPosts: expansionPosts.map(post => post.id) };
+  }
+
   /** Получить эффект улучшения */
   getUpgradeEffect(upgradeId, defaultValue = 1) {
     const def = BALANCE.upgrades[upgradeId];
