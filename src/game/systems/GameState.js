@@ -428,6 +428,29 @@ class GameState {
     return { success: true, employee: emp };
   }
 
+  /** Обучить сотрудника: повысить скорость или качество обслуживания. */
+  trainEmployee(empId, skill) {
+    const emp = this.employees.find(item => item.id === empId);
+    if (!emp) return { success: false, reason: 'Сотрудник не найден' };
+    if (emp.status === 'working' || emp.status === 'repairing') {
+      return { success: false, reason: 'Сотрудник занят. Дождись окончания работы.' };
+    }
+    if (skill !== 'speed' && skill !== 'quality') {
+      return { success: false, reason: 'Неизвестный навык' };
+    }
+    const current = Number(emp[skill]) || 0;
+    if (current >= 1) return { success: false, reason: 'Навык уже достиг максимума' };
+    const cost = skill === 'speed' ? 20_000 : 15_000;
+    if (this.money < cost) return { success: false, reason: 'Недостаточно средств для обучения' };
+    emp[skill] = Math.min(1, Math.round((current + 0.05) * 100) / 100);
+    this.money -= cost;
+    this.stats.totalExpenses += cost;
+    this.stats.todayExpenses += cost;
+    this._logFinance('expense', `Обучение сотрудника: ${skill === 'speed' ? 'скорость' : 'качество'}`, cost);
+    this.emit('stateChanged');
+    return { success: true, employee: emp, cost };
+  }
+
   /** Уволить сотрудника */
   fireEmployee(empId) {
     const idx = this.employees.findIndex(e => e.id === empId);
