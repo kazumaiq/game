@@ -303,7 +303,7 @@ export const BALANCE = {
     priceWarPrice: 100,
     buyoutOfferDay: 8,
     buyoutPrice: 1_200_000,
-    demandReductionDuringWar: 0.4,
+    demandReductionDuringWar: 0.88,
   },
 
   // Репутация
