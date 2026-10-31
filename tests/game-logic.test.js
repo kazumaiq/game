@@ -585,3 +585,37 @@ test('25. Обучение сотрудника повышает навык, с�
   assert.match(blocked.reason, /занят/i);
   assert.equal(employee.quality, BALANCE.employee.baseQuality);
 });
+
+
+test('29. Профилактика оборудования восстанавливает ресурс, списывает деньги и сохраняется', () => {
+  gameState.initNewGame('roadside');
+  const post = gameState.posts[0];
+  post.maintenance = 52;
+  const moneyBefore = gameState.money;
+
+  const result = gameState.servicePost(post.id);
+  assert.equal(result.success, true);
+  assert.equal(post.maintenance, 87);
+  assert.equal(gameState.money, moneyBefore - 12_000);
+
+  const blockedBusy = (() => {
+    post.busy = true;
+    return gameState.servicePost(post.id);
+  })();
+  assert.equal(blockedBusy.success, false);
+  assert.match(blockedBusy.reason, /мойки/i);
+  post.busy = false;
+
+  const saved = gameState.serialize();
+  gameState.reset();
+  assert.equal(gameState.deserialize(saved), true);
+  assert.equal(gameState.posts[0].maintenance, 87);
+});
+
+test('30. Профилактика не обслуживает неисправный или полностью исправный бокс', () => {
+  gameState.initNewGame('roadside');
+  const post = gameState.posts[0];
+  assert.equal(gameState.servicePost(post.id).reason, 'Оборудование уже обслужено');
+  post.broken = true;
+  assert.equal(gameState.servicePost(post.id).success, false);
+});
