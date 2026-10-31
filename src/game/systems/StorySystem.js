@@ -153,8 +153,7 @@ export class StorySystem {
             choices: [
               { text: 'Купить точку и оборудование за 1 200 000 ₽', action: () => {
                 if (gameState.money < 1_200_000) {
-                  showToast('Не хватает 1 200 000 ₽. Предложение пока остаётся открытым.', 'warning');
-                  showToast('Нужно накопить 1 200 000 ₽. Предложение останется доступным.', 'warning');
+                  showToast('Не хватает 1 200 000 ₽. Предложение появится снова, когда накопите нужную сумму.', 'warning');
                   return;
                 }
                 gameState.money -= 1_200_000;
@@ -162,11 +161,13 @@ export class StorySystem {
                 gameState.competitorAcquired = true;
                 gameState.posts[2].unlocked = true;
                 gameState.posts[3].unlocked = true;
+                gameState.posts[2].maintenance = 100;
+                gameState.posts[3].maintenance = 100;
                 gameState.setStoryFlag('competitor_acquired');
                 gameState.emit('stateChanged');
                 showDialog({
                   speaker: 'Новая глава',
-                  text: 'Вы выкупили закрывшуюся точку «КлинАвто». Теперь у вас две автомойки и шанс построить собственную сеть.',
+                  text: 'Вы выкупили оборудование и клиентскую базу закрывшейся точки «КлинАвто». Два дополнительных бокса теперь доступны на вашей площадке. Вы расширили автомойку до четырёх постов.',
                   choices: [{ text: 'Продолжить', action: () => showToast('Новая точка добавлена в вашу историю.', 'success') }],
                 });
               }},
