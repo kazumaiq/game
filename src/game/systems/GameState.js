@@ -104,6 +104,8 @@ class GameState {
     this.competitorBrokenBays = 0;
     this.competitorClosed = false;
     this.competitorAcquired = false;
+    this.branches = [];
+    this.branchSequence = 1;
 
     this.settings = {
       soundEnabled: true,
@@ -318,6 +320,7 @@ class GameState {
     }
 
     const total = rent + utilities + salaries;
+    this.settleBranchesDaily();
 
     this.money -= total;
     this.stats.totalExpenses += total;
@@ -426,6 +429,52 @@ class GameState {
     this._checkCareerAchievements();
     this.emit('stateChanged');
     return { success: true, postId, price };
+  }
+
+
+  openBranch(locationId = 'residential') {
+    const location = BALANCE.locations[locationId];
+    const price = BALANCE.branch.purchasePrice;
+    if (!location) return { success: false, reason: 'Неизвестная локация' };
+    if (!this.competitorAcquired) return { success: false, reason: 'Сначала выкупи активы «КлинАвто»' };
+    if (this.branches.length >= BALANCE.branch.maxBranches) return { success: false, reason: 'Достигнут лимит филиалов' };
+    if (this.branches.some(item => item.locationId === locationId)) return { success: false, reason: 'В этой локации уже есть филиал' };
+    if (this.money < price) return { success: false, reason: 'Недостаточно средств', missing: price - this.money };
+    const branch = { id: 'branch_' + this.branchSequence++, name: location.name, locationId, manager: '', employees: 0, bays: 2, servicePrice: 500, reputation: 50, suppliesStock: 100, totalCars: 0, totalRevenue: 0, totalExpenses: 0, lastDayProfit: 0 };
+    this.money -= price; this.stats.totalExpenses += price; this.stats.todayExpenses += price;
+    this._logFinance('expense', 'Открытие филиала: ' + location.name, price);
+    this.branches.push(branch); this.emit('stateChanged');
+    return { success: true, branch, price };
+  }
+
+  assignBranchManager(branchId, managerName) {
+    const branch = this.branches.find(item => item.id === branchId);
+    const name = String(managerName || '').trim();
+    if (!branch) return { success: false, reason: 'Филиал не найден' };
+    if (name.length < 2 || name.length > 40) return { success: false, reason: 'Имя управляющего должно содержать 2–40 символов' };
+    branch.manager = name; this.emit('stateChanged');
+    return { success: true, branch };
+  }
+
+  settleBranchesDaily() {
+    let networkProfit = 0;
+    for (const branch of this.branches) {
+      const location = BALANCE.locations[branch.locationId];
+      const managed = !!branch.manager;
+      const cars = Math.min(branch.bays * (managed ? 7 : 3), Math.round(8 * location.customerFlow * branch.reputation / 50), branch.suppliesStock);
+      const revenue = Math.round(cars * branch.servicePrice * location.avgCheckMultiplier);
+      const supplies = cars * 100;
+      const fixed = location.dailyRent + BALANCE.dailyCosts.utilities + branch.employees * BALANCE.employee.dailySalary + (managed ? BALANCE.branch.managerSalary : 0);
+      const profit = revenue - supplies - fixed;
+      branch.suppliesStock -= cars; branch.totalCars += cars; branch.totalRevenue += revenue;
+      branch.totalExpenses += supplies + fixed; branch.lastDayProfit = profit; this.money += profit;
+      this.stats.totalRevenue += revenue; this.stats.totalExpenses += supplies + fixed;
+      this.stats.todayRevenue += revenue; this.stats.todayExpenses += supplies + fixed;
+      this._logFinance(profit >= 0 ? 'income' : 'expense', branch.name + ': ' + cars + ' машин за смену', Math.abs(profit));
+      networkProfit += profit;
+    }
+    if (this.branches.length) this.emit('stateChanged');
+    return networkProfit;
   }
 
   /** Продажа бизнеса по сюжетному предложению конкурента. */
@@ -922,6 +971,8 @@ class GameState {
       competitorBrokenBays: this.competitorBrokenBays,
       competitorClosed: this.competitorClosed,
       competitorAcquired: this.competitorAcquired,
+      branches: this.branches.map(branch => ({ ...branch })),
+      branchSequence: this.branchSequence,
       settings: { ...this.settings },
       posts: this.posts.map(p => ({ id: p.id, broken: p.broken, unlocked: p.unlocked !== false, maintenance: Number.isFinite(p.maintenance) ? p.maintenance : 100 })),
     };
@@ -981,6 +1032,19 @@ class GameState {
     this.competitorBrokenBays = Math.max(0, Math.min(2, Number(data.competitorBrokenBays) || 0));
     this.competitorClosed = !!data.competitorClosed;
     this.competitorAcquired = !!data.competitorAcquired;
+    this.branches = Array.isArray(data.branches) ? data.branches.filter(b => b && typeof b.id === 'string' && BALANCE.locations[b.locationId]).map(b => ({
+      id: b.id, name: String(b.name || 'Филиал'), locationId: b.locationId, manager: String(b.manager || ''),
+      employees: Math.max(0, Math.min(4, Math.floor(Number(b.employees) || 0))),
+      bays: Math.max(1, Math.min(4, Math.floor(Number(b.bays) || 2))),
+      servicePrice: Math.max(100, Math.min(2000, Number(b.servicePrice) || 500)),
+      reputation: Math.max(0, Math.min(100, Number(b.reputation) || 50)),
+      suppliesStock: Math.max(0, Math.floor(Number(b.suppliesStock) || 0)),
+      totalCars: Math.max(0, Math.floor(Number(b.totalCars) || 0)),
+      totalRevenue: Math.max(0, Number(b.totalRevenue) || 0),
+      totalExpenses: Math.max(0, Number(b.totalExpenses) || 0), lastDayProfit: Number(b.lastDayProfit) || 0,
+    })) : [];
+    this.branchSequence = Math.max(1, Math.floor(Number(data.branchSequence) || this.branches.length + 1));
+
 
     if (data.achievements && typeof data.achievements === 'object') this.achievements = { ...data.achievements };
     this.perfectWashStreak = Math.max(0, Math.floor(Number(data.perfectWashStreak) || 0));
