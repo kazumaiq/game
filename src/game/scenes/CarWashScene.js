@@ -1314,6 +1314,13 @@ export default class CarWashScene extends Phaser.Scene {
       return;
     }
 
+    const rivalDistance = Phaser.Math.Distance.Between(this.player.x, this.player.y, 450, 710);
+    if (rivalDistance < 126) {
+      btnText.textContent = 'КЛИНАВТО';
+      btnSub.textContent = gameState.competitorClosed ? 'ОБЪЕКТ ЗАКРЫТ' : 'ОСМОТРЕТЬ КОНКУРЕНТА';
+      return;
+    }
+
     const coffeeDistance = Phaser.Math.Distance.Between(this.player.x, this.player.y, 816, 224);
     if (coffeeDistance < 108) {
       btnText.textContent = 'КОФЕ';
@@ -1408,6 +1415,23 @@ export default class CarWashScene extends Phaser.Scene {
 
   _handleInteract() {
     if (gameState.paused || !gameState.shiftActive) return;
+
+    // The rival site is a real point of interest in the world. Walk across the
+    // road and inspect its current condition, pricing and operational status.
+    const rivalDistance = Phaser.Math.Distance.Between(this.player.x, this.player.y, 450, 710);
+    if (!this._isWashing && rivalDistance < 112 && gameState.competitorActive) {
+      audioManager.play('buttonClick');
+      if (gameState.competitorAcquired) {
+        showToast('КлинАвто теперь часть вашей сети. Управляй точкой через меню «Бизнес».', 'success');
+      } else if (gameState.competitorClosed) {
+        showToast('КлинАвто закрыто. Осмотри объект: оборудование и два бокса выведены из строя.', 'warning');
+      } else if (gameState.competitorPriceWar) {
+        showToast('КлинАвто демпингует: экспресс-мойка 100 ₽. Их очередь растёт, твой поток просел.', 'warning');
+      } else {
+        showToast('КлинАвто · сеть из 47 автомоек. Региональный игрок открылся прямо напротив.', 'info');
+      }
+      return;
+    }
 
     // Coffee Stop is a useful customer amenity: one interaction gives the queue
     // a short patience boost, so the neighbouring cafe has a clear gameplay role.
