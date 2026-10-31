@@ -71,6 +71,9 @@ export default class CarWashScene extends Phaser.Scene {
     // object is redrawn only while the active wash is running.
     this._wetFloorGfx = this.add.graphics().setDepth(18.6);
     this._wetFloorGfx.setBlendMode(Phaser.BlendModes.NORMAL);
+    // Animated wash-bay hardware is drawn into one reusable layer; no per-frame sprites.
+    this._equipmentGfx = this.add.graphics().setDepth(11.4);
+    this._equipmentAnimTimer = 0;
     this._lastWetPosition = null;
     this._wetFloorUntil = 0;
 
@@ -757,6 +760,69 @@ export default class CarWashScene extends Phaser.Scene {
       const y = 352 + (i % 3) * 31;
       water.fillStyle(i % 2 ? 0x67e8f9 : 0x94a3b8, 0.075 + (i % 3) * 0.018);
       water.fillEllipse(x, y, 18 + (i % 4) * 7, 2 + (i % 2));
+    }
+  }
+
+  /** Animated gantry rollers, status lamps and flexible pressure hoses. Purely visual. */
+  _updateEquipmentAnimation(time) {
+    const g = this._equipmentGfx;
+    if (!g) return;
+    g.clear();
+    const phase = time * 0.006;
+    for (let i = 0; i < WORLD.posts.length; i++) {
+      const post = gameState.posts[i];
+      if (!post || post.unlocked === false) continue;
+      const pos = WORLD.posts[i];
+      const active = !!post.busy && !post.broken;
+      const broken = !!post.broken;
+      const pulse = 0.5 + (Math.sin(phase * 1.7 + i) + 1) * 0.18;
+
+      // Gantry crossbar and compact service-status lamp.
+      g.fillStyle(0x071522, 0.88);
+      g.fillRoundedRect(pos.x - 91, pos.y - 73, 182, 7, 3);
+      g.lineStyle(1, 0x8beaff, active ? 0.62 : 0.24);
+      g.strokeRoundedRect(pos.x - 91, pos.y - 73, 182, 7, 3);
+      g.fillStyle(broken ? 0xef4444 : active ? 0x34d399 : 0x64748b,
+        broken ? 0.9 : active ? 0.55 + pulse * 0.35 : 0.28);
+      g.fillCircle(pos.x, pos.y - 69.5, 2.5);
+
+      if (broken) continue;
+      // Side rotary brushes: rotating spokes provide readable motion even at phone scale.
+      for (const side of [-1, 1]) {
+        const x = pos.x + side * 78;
+        const y = pos.y + 7;
+        g.fillStyle(0x07111c, 0.82);
+        g.fillRoundedRect(x - 7, y - 30, 14, 60, 6);
+        g.fillStyle(active ? 0x0e7490 : 0x334155, active ? 0.72 : 0.48);
+        g.fillRoundedRect(x - 5, y - 27, 10, 54, 5);
+        g.lineStyle(2, active ? 0x9be7ff : 0x94a3b8, active ? 0.72 : 0.3);
+        for (let spoke = 0; spoke < 4; spoke++) {
+          const a = phase * (active ? 2.2 : 0.28) + spoke * Math.PI / 2 + (side < 0 ? Math.PI / 4 : 0);
+          const x1 = x + Math.cos(a) * 3;
+          const y1 = y + Math.sin(a) * 3;
+          const x2 = x + Math.cos(a) * 9;
+          const y2 = y + Math.sin(a) * 9;
+          g.lineBetween(x1, y1, x2, y2);
+        }
+        if (active) {
+          g.fillStyle(0x67e8f9, 0.08 + pulse * 0.08);
+          g.fillEllipse(x, y, 25, 66);
+        }
+      }
+
+      // A visible coiled hose hangs from the gantry while the post is operating.
+      if (active) {
+        const hoseX = pos.x + 48;
+        g.lineStyle(3, 0x101c2b, 0.9);
+        g.beginPath();
+        g.moveTo(hoseX, pos.y - 68);
+        g.lineTo(hoseX + 5 + Math.sin(phase + i) * 3, pos.y - 43);
+        g.lineTo(hoseX - 4 + Math.sin(phase * 0.8 + i) * 4, pos.y - 18);
+        g.lineTo(hoseX + 4 + Math.sin(phase + i) * 3, pos.y + 3);
+        g.strokePath();
+        g.lineStyle(1, 0x67e8f9, 0.52);
+        g.lineBetween(hoseX + 1, pos.y - 66, hoseX + 4, pos.y - 43);
+      }
     }
   }
 
@@ -1899,6 +1965,11 @@ export default class CarWashScene extends Phaser.Scene {
     this._updateActionBtnContext();
     this._updateTargetHighlight(time);
     this._updateSprayEffect(time);
+    this._equipmentAnimTimer += delta;
+    if (this._equipmentAnimTimer >= 55) {
+      this._equipmentAnimTimer = 0;
+      this._updateEquipmentAnimation(time);
+    }
     this._updatePostStatuses();
 
     if (gameState.shiftTimeRemaining <= 0) {
@@ -2352,6 +2423,8 @@ export default class CarWashScene extends Phaser.Scene {
       this._sprayGfx.destroy();
     }
     if (this._wetFloorGfx) this._wetFloorGfx.destroy();
+    if (this._equipmentGfx) this._equipmentGfx.destroy();
+    this._equipmentGfx = null;
     this._wetFloorGfx = null;
     if (this._waterMist) this._waterMist.destroy();
     if (this._foamMist) this._foamMist.destroy();
