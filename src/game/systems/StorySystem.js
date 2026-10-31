@@ -157,7 +157,9 @@ export class StorySystem {
                   return;
                 }
                 gameState.money -= 1_200_000;
-                gameState._logFinance('expense', 'Покупка точки «КлинАвто»', 1_200_000);
+                gameState.stats.totalExpenses += 1_200_000;
+                gameState.stats.todayExpenses += 1_200_000;
+                gameState._logFinance('expense', 'Покупка оборудования «КлинАвто»', 1_200_000);
                 gameState.competitorAcquired = true;
                 gameState.posts[2].unlocked = true;
                 gameState.posts[3].unlocked = true;
