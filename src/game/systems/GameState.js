@@ -254,12 +254,17 @@ class GameState {
     return price - supplyCost;
   }
 
+  getAverageSupplyCost() {
+    const averageMultiplier = Object.values(BALANCE.carClasses).reduce((sum, item) => sum + item.supplyCostMultiplier, 0) / Math.max(1, Object.keys(BALANCE.carClasses).length);
+    return Math.round(BALANCE.services.expressWash.supplyCost * averageMultiplier * this.getUpgradeEffect('supplyEfficiency', 1));
+  }
+
   getBusinessHealth() {
     const location = this.getLocation();
     const unlockedPosts = this.posts.filter(post => post.unlocked !== false);
     const dailyPayroll = this.employees.length * BALANCE.employee.dailySalary;
     const dailyFixed = (location?.dailyRent || 0) + BALANCE.dailyCosts.utilities + dailyPayroll;
-    const avgWashMargin = Math.round(this.servicePrice - BALANCE.services.expressWash.supplyCost);
+    const avgWashMargin = Math.round(this.servicePrice - this.getAverageSupplyCost());
     const todayProfit = (Number(this.stats.todayRevenue) || 0) - (Number(this.stats.todayExpenses) || 0);
     return {
       dailyFixed, dailyPayroll, todayProfit,
