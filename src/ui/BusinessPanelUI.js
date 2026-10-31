@@ -120,6 +120,20 @@ export function showBusinessPanel() {
         </div>
       </div>
 
+      <div class="panel-section">
+        <h3>Дополнительные услуги</h3>
+        <p style="color:#94a3b8;font-size:12px;">Выбери услуги, которые будут предлагаться каждому клиенту. Дополнительные материалы автоматически учитываются в себестоимости и прибыли.</p>
+        ${gameState.getExtraServiceCatalog().map(service => {
+          const active = (gameState.selectedExtras || []).includes(service.id);
+          const margin = service.price - service.cost;
+          return '<label class="expansion-card" style="display:flex;align-items:center;gap:12px;cursor:pointer;">' +
+            '<input type="checkbox" data-extra-service="' + service.id + '" ' + (active ? 'checked' : '') + ' style="width:18px;height:18px;accent-color:#38bdf8;flex-shrink:0;">' +
+            '<span class="expansion-copy"><strong>' + service.name + '</strong><span>' + service.description + '</span><small>Цена +' + fmt(service.price) + ' · материалы ' + fmt(service.cost) + ' · маржа +' + fmt(margin) + '</small></span>' +
+            '<span class="expansion-status">' + (active ? 'АКТИВНА' : 'ВЫКЛ') + '</span>' +
+            '</label>';
+        }).join('')}
+      </div>
+
       <div class="panel-section expansion-section">
         <h3>Расширение автомойки</h3>
         <p style="color:#94a3b8;font-size:12px;margin:0 0 10px;">Открывай новые боксы, чтобы обслуживать больше машин параллельно и быстрее выполнять контракты.</p>
@@ -216,6 +230,21 @@ export function showBusinessPanel() {
   });
   panel.addEventListener('click', (e) => {
     if (e.target === panel) panel.remove();
+  });
+
+  // Дополнительные услуги для клиентов
+  panel.querySelectorAll('[data-extra-service]').forEach(input => {
+    input.addEventListener('change', () => {
+      const result = gameState.toggleExtraService(input.dataset.extraService, input.checked);
+      if (result.success) {
+        audioManager.play('buttonClick');
+        panel.remove();
+        showBusinessPanel();
+      } else {
+        audioManager.play('error');
+        showToast(result.reason, 'warning');
+      }
+    });
   });
 
   // Профилактика оборудования
