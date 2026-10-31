@@ -1253,6 +1253,9 @@ export default class CarWashScene extends Phaser.Scene {
 
     audioManager.stopSpray();
     if (this._sprayGfx) this._sprayGfx.clear();
+    if (this._waterMist?.emitting) this._waterMist.stop();
+    if (this._foamMist?.emitting) this._foamMist.stop();
+    this._activeSprayEmitter = null;
     audioManager.play('cashRegister');
     const profit = gameState.addServiceIncome(car.id, quality);
     hideWashProgress();
@@ -1285,6 +1288,9 @@ export default class CarWashScene extends Phaser.Scene {
   _stopWashing() {
     audioManager.stopSpray();
     if (this._sprayGfx) this._sprayGfx.clear();
+    if (this._waterMist?.emitting) this._waterMist.stop();
+    if (this._foamMist?.emitting) this._foamMist.stop();
+    this._activeSprayEmitter = null;
     this._isWashing = false;
     this._washingCar = null;
     this.player.setTexture('player_idle');
