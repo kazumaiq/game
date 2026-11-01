@@ -130,6 +130,8 @@ export const BALANCE = {
     },
   },
 
+  branch: { purchasePrice: 2_400_000, maxBranches: 3, managerSalary: 5_000 },
+
   // Услуги
   services: {
     expressWash: {
@@ -145,7 +147,7 @@ export const BALANCE = {
         rinse: 'Смывание',
         finish: 'Финишная обработка',
       },
-      baseDuration: 3000,
+      baseDuration: 1600,
     },
   },
 
@@ -303,7 +305,7 @@ export const BALANCE = {
     priceWarPrice: 100,
     buyoutOfferDay: 8,
     buyoutPrice: 1_200_000,
-    demandReductionDuringWar: 0.4,
+    demandReductionDuringWar: 0.88,
   },
 
   // Репутация

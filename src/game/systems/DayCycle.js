@@ -11,14 +11,14 @@ const PHASES = {
 };
 
 const KEYFRAMES = [
-  { hour: 8, color: 0xffd9a0, tintAlpha: 0.105, lampAlpha: 0.08 },
-  { hour: 9, color: 0xffe7c0, tintAlpha: 0.055, lampAlpha: 0.025 },
-  { hour: 10, color: 0xffffff, tintAlpha: 0, lampAlpha: 0 },
-  { hour: 16, color: 0xfff4dd, tintAlpha: 0.018, lampAlpha: 0.015 },
-  { hour: 17.5, color: 0xffbc7a, tintAlpha: 0.105, lampAlpha: 0.16 },
-  { hour: 18.5, color: 0xe28b80, tintAlpha: 0.16, lampAlpha: 0.38 },
-  { hour: 19.25, color: 0x55517c, tintAlpha: 0.27, lampAlpha: 0.72 },
-  { hour: 20, color: 0x1b2b56, tintAlpha: 0.39, lampAlpha: 1 },
+  { hour: 8, color: 0xffc875, tintAlpha: 0.17, lampAlpha: 0.12 },
+  { hour: 9, color: 0xffdfaa, tintAlpha: 0.085, lampAlpha: 0.035 },
+  { hour: 10, color: 0xffffff, tintAlpha: 0.008, lampAlpha: 0 },
+  { hour: 16, color: 0xfff0d0, tintAlpha: 0.025, lampAlpha: 0.025 },
+  { hour: 17.5, color: 0xffa45f, tintAlpha: 0.14, lampAlpha: 0.24 },
+  { hour: 18.5, color: 0xc96b83, tintAlpha: 0.23, lampAlpha: 0.52 },
+  { hour: 19.25, color: 0x474d85, tintAlpha: 0.34, lampAlpha: 0.86 },
+  { hour: 20, color: 0x142347, tintAlpha: 0.46, lampAlpha: 1 },
 ];
 
 function clamp(value, min, max) {

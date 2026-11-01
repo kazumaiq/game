@@ -10,7 +10,7 @@
   <pattern id="grassMarks" width="28" height="22" patternUnits="userSpaceOnUse"><path d="M4 18l3-5m5 6 2-4m8 1 2-6" stroke="#8dbf82" stroke-opacity=".28" stroke-width="1.3"/><circle cx="20" cy="6" r="1" fill="#e4d28d" fill-opacity=".45"/></pattern>
   <filter id="blur20"><feGaussianBlur stdDeviation="20"/></filter>
   <filter id="shadow"><feGaussianBlur stdDeviation="7"/></filter>
-</defs>
+<pattern id="comicDots" width="12" height="12" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.15" fill="#f5b6d0" fill-opacity=".48"/></pattern></defs>
 <rect width="900" height="640" fill="url(#sky)"/>
 <ellipse cx="456" cy="103" rx="230" ry="95" fill="url(#sunGlow)"/>
 <circle cx="470" cy="85" r="39" fill="#ffcb83" fill-opacity=".38"/>
@@ -70,4 +70,4 @@
  <circle cx="831" cy="474" r="16" fill="#20734c"/><circle cx="850" cy="464" r="19" fill="#25945a"/><circle cx="855" cy="480" r="14" fill="#136340"/>
  <circle cx="846" cy="460" r="5" fill="#9ce6a4" fill-opacity=".72"/>
 </g>
-</svg>
+<rect width="900" height="640" fill="url(#comicDots)" opacity=".24"/><g fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M20 26Q20 8 38 8H862Q880 8 880 26V531H20Z" stroke="#050814" stroke-width="5" opacity=".72"/><path d="M14 32L2 58M886 32L898 58M14 500L2 522M886 500L898 522" stroke="#ff4f91" stroke-width="3" opacity=".65"/><path d="M26 18H874" stroke="#6cecff" stroke-width="2" opacity=".62"/></g><g fill="#ff4f91" opacity=".3"><path d="M0 210l72-34-48 48zM900 260l-68-24 48 43z"/></g></svg>

@@ -52,9 +52,10 @@ export class StorySystem {
         flag: 'competitor_appears',
         handler: (scene) => {
           gameState.competitorActive = true;
+          gameState.emit('stateChanged');
           showDialog({
             speaker: 'Новости района',
-            text: 'Крупная сеть автомоек "КлинАвто" (47 филиалов по стране) открывает точку в 500 метрах от вас! Возможна ценовая война. Подготовьтесь.',
+            text: 'Через дорогу, прямо напротив вашей мойки, открывается новая точка федеральной сети «КлинАвто». У сети 47 автомоек. На открытии сцена, диджей, толпа гостей и очередь из машин. Региональный директор лично наблюдает за запуском. Это уже не просто сосед, а серьёзный конкурент.',
             choices: [
               { text: 'Буду бороться!', action: () => {
                 showToast('Конкурент появился рядом', 'warning');
@@ -69,9 +70,10 @@ export class StorySystem {
         flag: 'price_war_start',
         handler: (scene) => {
           gameState.competitorPriceWar = true;
+          gameState.emit('stateChanged');
           showDialog({
             speaker: 'Новости района',
-            text: `"КлинАвто" запустила акцию — мойка за ${BALANCE.competitor.priceWarPrice} ₽! Ваш поток клиентов заметно уменьшился. Нужно решить: снижать цены, повышать качество или запускать маркетинг.`,
+            text: `«КлинАвто» начинает демпинг: мойка за ${BALANCE.competitor.priceWarPrice} ₽ против ваших ${gameState.servicePrice} ₽. Поток падает примерно с 40 до 3-5 машин за день. Вы вложили почти 6 000 000 ₽, на счету осталось около 600 000 ₽. Директор предлагает выкупить вашу автомойку за 1 200 000 ₽. Придётся выбирать стратегию и держаться.`,
             choices: [
               { text: 'Изучу варианты', action: () => {
                 showToast('Ценовая война началась! Откройте управление бизнесом.', 'warning');
@@ -93,9 +95,11 @@ export class StorySystem {
               {
                 text: `Продать за ${BALANCE.competitor.buyoutPrice.toLocaleString('ru-RU')} ₽`,
                 action: () => {
-                  gameState.buyoutAccepted = true;
-                  gameState.money += BALANCE.competitor.buyoutPrice;
-                  gameState._logFinance('income', 'Продажа бизнеса', BALANCE.competitor.buyoutPrice);
+                  const sale = gameState.acceptBusinessBuyout();
+                  if (!sale.success) {
+                    showToast(sale.reason, 'warning');
+                    return;
+                  }
                   showDialog({
                     speaker: 'Эпилог',
                     text: `Вы продали бизнес за ${BALANCE.competitor.buyoutPrice.toLocaleString('ru-RU')} ₽. Итоговый баланс: ${gameState.money.toLocaleString('ru-RU')} ₽. Может быть, стоило побороться дальше?`,
@@ -122,16 +126,93 @@ export class StorySystem {
         id: 'competitor_weakens',
         day: BALANCE.competitor.buyoutOfferDay + 3,
         flag: 'competitor_weakens',
-        condition: () => gameState.hasStoryFlag('buyout_rejected') && gameState.reputation >= 60,
+        condition: () => gameState.hasStoryFlag('buyout_rejected'),
         handler: (scene) => {
           gameState.competitorPriceWar = false;
+          gameState.competitorBrokenBays = 2;
+          gameState.competitorClosed = true;
+          gameState.competitorPriceWar = false;
+          gameState.emit('stateChanged');
           showDialog({
             speaker: 'Новости района',
-            text: '"КлинАвто" прекратила демпинг — акция оказалась убыточной. Ваша стойкость и качество окупились! Поток клиентов восстанавливается.',
+            text: 'После затяжной ценовой войны у «КлинАвто» выходят из строя два моечных бокса. Ремонт затягивается, расходы сети растут. Поток клиентов постепенно возвращается к вам. Впервые за долгое время директор сети теряет уверенность.',
             choices: [{ text: 'Победа!', action: () => {
               showToast('Конкурент отступил!', 'success');
               gameState.changeReputation(10);
             }}],
+          });
+        },
+      },
+      {
+        id: 'competitor_final_buyout',
+        day: BALANCE.competitor.buyoutOfferDay + 5,
+        flag: 'competitor_final_buyout',
+        condition: () => gameState.hasStoryFlag('buyout_rejected') && gameState.competitorClosed,
+        handler: (scene) => {
+          showDialog({
+            speaker: 'Региональный директор «КлинАвто»',
+            text: 'Мы закрываем эту точку. Выстояли там, где не справилась федеральная сеть. Предлагаю другую сделку: продадим вам оборудование и готовый бизнес этой автомойки за 1 200 000 ₽. Решение за вами.',
+            choices: [
+              { text: 'Купить точку и оборудование за 1 200 000 ₽', action: () => {
+                if (gameState.money < 1_200_000) {
+                  showToast('Не хватает 1 200 000 ₽. Предложение появится снова, когда накопите нужную сумму.', 'warning');
+                  return;
+                }
+                const purchase = gameState.acquireCompetitorAssets();
+                if (!purchase.success) {
+                  showToast(purchase.reason === 'Недостаточно средств'
+                    ? 'Не хватает 1 200 000 ₽. Предложение появится снова, когда накопите нужную сумму.'
+                    : purchase.reason, 'warning');
+                  return;
+                }
+                showDialog({
+                  speaker: 'Новая глава',
+                  text: 'Вы выкупили оборудование и клиентскую базу закрывшейся точки «КлинАвто». Два дополнительных бокса теперь доступны на вашей площадке. Вы расширили автомойку до четырёх постов.',
+                  choices: [{ text: 'Продолжить', action: () => showToast('Новая точка добавлена в вашу историю.', 'success') }],
+                });
+              }},
+              { text: 'Пока отказаться', action: () => {
+                gameState.setStoryFlag('competitor_buyout_declined');
+                showToast('Вы отказались от покупки. Точка остаётся закрытой.', 'info');
+              }},
+            ],
+          });
+        },
+      },
+      {
+        id: 'competitor_final_buyout_retry',
+        day: BALANCE.competitor.buyoutOfferDay + 6,
+        flag: 'competitor_final_buyout_retry',
+        condition: () => gameState.hasStoryFlag('buyout_rejected')
+          && gameState.competitorClosed
+          && !gameState.competitorAcquired
+          && !gameState.hasStoryFlag('competitor_buyout_declined')
+          && gameState.money >= BALANCE.competitor.buyoutPrice,
+        handler: () => {
+          showDialog({
+            speaker: 'Региональный директор «КлинАвто»',
+            text: 'Вы собрали нужную сумму. Предложение о покупке оборудования и клиентской базы всё ещё в силе. Готовы расширить свою автомойку?',
+            choices: [
+              { text: 'Купить за 1 200 000 ₽', action: () => {
+                const price = BALANCE.competitor.buyoutPrice;
+                if (gameState.money < price) {
+                  showToast('На счету снова недостаточно средств.', 'warning');
+                  return;
+                }
+                const purchase = gameState.acquireCompetitorAssets();
+                if (!purchase.success) {
+                  showToast(purchase.reason === 'Недостаточно средств'
+                    ? 'На счету снова недостаточно средств.'
+                    : purchase.reason, 'warning');
+                  return;
+                }
+                showToast('Два дополнительных бокса открыты!', 'success');
+              }},
+              { text: 'Отказаться', action: () => {
+                gameState.setStoryFlag('competitor_buyout_declined');
+                showToast('Вы отказались от сделки.', 'info');
+              }},
+            ],
           });
         },
       },

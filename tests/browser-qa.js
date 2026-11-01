@@ -59,20 +59,26 @@ async function runBrowserQA() {
 
   // 2. Запуск Chrome через Puppeteer
   console.log('2. Запуск Chrome (Headless: new, WebGL & Web Audio enabled)...');
-  const browser = await puppeteer.launch({
-    executablePath: CHROME_PATH,
-    headless: 'new',
-    args: [
-      '--use-gl=angle',
-      '--use-angle=d3d11',
-      '--autoplay-policy=no-user-gesture-required',
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-web-security',
-    ],
-  });
-
-  const page = await browser.newPage();
+  let browser;
+  let page;
+  try {
+    browser = await puppeteer.launch({
+      executablePath: CHROME_PATH,
+      headless: 'new',
+      args: [
+        ...(process.platform === 'win32' ? ['--use-gl=angle', '--use-angle=d3d11'] : []),
+        '--autoplay-policy=no-user-gesture-required',
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-web-security',
+      ],
+    });
+    page = await browser.newPage();
+  } catch (error) {
+    if (browser) await browser.close();
+    await server.close();
+    throw error;
+  }
 
   page.on('dialog', async (dialog) => {
     console.log(`[Browser Dialog] ${dialog.type()}: "${dialog.message()}" -> ACCEPT`);
@@ -118,7 +124,10 @@ async function runBrowserQA() {
   try {
     // ШАГ 1: Загрузка страницы
     console.log(`3. Открытие ${serverUrl}...`);
-    await page.goto(serverUrl, { waitUntil: 'networkidle0' });
+    // Phaser/Three.js keep rendering activity alive; networkidle0 can remain
+    // pending even after the app is usable. Wait for the document, then check UI.
+    await page.goto(serverUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    await page.waitForSelector('#game-container canvas', { timeout: 15000 });
     await new Promise((r) => setTimeout(r, 1000));
 
     // Скриншот 1: Главное меню
@@ -309,7 +318,7 @@ async function runBrowserQA() {
     results.errors.push(err.toString());
   } finally {
     results.errors.push(...errors);
-    await browser.close();
+    if (browser) await browser.close();
     await server.close();
     console.log('\n=== BROWSER QA ЗАВЕРШЕН ===');
   }

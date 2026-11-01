@@ -17,6 +17,16 @@ export default class MenuScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#060a12');
 
     this._objects = [];
+    this._menuElapsed = 0;
+    this.cameras.main.setZoom(1.012);
+    this.tweens.add({
+      targets: this.cameras.main,
+      zoom: 1.028,
+      duration: 14000,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.inOut',
+    });
 
     // === КИНОШНЫЙ НЕБОСКЛОН: глубокий индиго переходит в тёплый закат ===
     const skyGrad = this.add.graphics();
@@ -330,6 +340,19 @@ export default class MenuScene extends Phaser.Scene {
     // === МЕРЦАНИЕ НЕОНА (таймер) ===
     this._neonFlicker = 0;
 
+
+    // Subtle graphic-novel print pass: halftones and offset cyan/magenta ink slashes.
+    const comicPrint=this.add.graphics().setDepth(30);
+    for(let y=10;y<height;y+=13)for(let x=8;x<width;x+=13){
+      const vignette=Math.max(0,1-Math.abs(x-width*0.5)/(width*0.62));
+      comicPrint.fillStyle((Math.floor(x/13)+Math.floor(y/13))%2?0xff4f91:0x62eaff,0.025+(1-vignette)*0.045);
+      comicPrint.fillCircle(x,y,0.8+(y/height)*0.65);
+    }
+    comicPrint.lineStyle(3,0x070914,0.72);
+    comicPrint.lineBetween(0,height*0.18,width*0.16,0);comicPrint.lineBetween(width,height*0.22,width*0.84,0);
+    comicPrint.lineStyle(2,0xff4f91,0.62);comicPrint.lineBetween(0,height*0.2,width*0.14,0);
+    comicPrint.lineStyle(2,0x62eaff,0.62);comicPrint.lineBetween(width,height*0.24,width*0.86,0);
+
     // === ПОКАЗЫВАЕМ МЕНЮ ===
     const hasSave = saveSystem.hasSave();
     showMenu({
@@ -340,7 +363,8 @@ export default class MenuScene extends Phaser.Scene {
   }
 
   update(time, delta) {
-    const dt = delta / 16.67; // нормализация к 60fps
+    const dt = Math.min(2.5, delta / 16.67); // нормализация с защитой от скачка после background
+    this._menuElapsed += delta;
 
     // Пена — пульсация
     if (this._foamGfx) {

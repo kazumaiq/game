@@ -58,7 +58,7 @@ test('4. Добавление машины, расход материалов и
 
   const net = gameState.addServiceIncome(car.id, 1.0);
   assert.equal(net, 400);
-  assert.equal(gameState.money, startMoney + 400);
+  assert.equal(gameState.money, startMoney + 400 + 2500); // net from wash + one-time first-wash achievement
   assert.equal(car.paid, true);
   assert.equal(car.completed, true);
   assert.equal(gameState.stats.todayCarsWashed, 1);
@@ -230,7 +230,7 @@ test('13. Шаг 4 завершается после начисления опл
   const moneyBefore = gameState.money;
   const net = gameState.addServiceIncome(car.id, 1.0);
   assert.ok(net > 0);
-  assert.equal(gameState.money, moneyBefore + net);
+  assert.equal(gameState.money, moneyBefore + net + 2500); // first-wash career reward
 
   // Завершение обучения переводит флаг
   gameState.completeTutorial();
@@ -240,7 +240,7 @@ test('13. Шаг 4 завершается после начисления опл
   // Повторная попытка завершить заказ не начисляет деньги
   const secondIncome = gameState.addServiceIncome(car.id, 1.0);
   assert.equal(secondIncome, 0);
-  assert.equal(gameState.money, moneyBefore + net);
+  assert.equal(gameState.money, moneyBefore + net + 2500);
 });
 
 test('14. Отсутствие целевой машины восстанавливается', () => {
@@ -454,6 +454,104 @@ test('23. Часы смены плавно проходят утро, день �
   assert.equal(getShiftClock(-500, cfg).clock, '20:00');
 });
 
+test('25. Карьерные достижения выплачиваются один раз и сохраняются', () => {
+  gameState.initNewGame('roadside');
+  const first = gameState.addCar('sedan');
+  assert.ok(first);
+  assert.equal(gameState.assignCarToPost(first.id, 'post_1'), true);
+  const beforeFirstWash = gameState.money;
+  const net = gameState.addServiceIncome(first.id, 0.75);
+  assert.equal(net, 400);
+  assert.equal(gameState.money, beforeFirstWash + net + 2500);
+  assert.equal(gameState.achievements.first_wash, true);
+  assert.ok(gameState.getCareerAchievements().find(item => item.id === 'first_wash').unlocked);
+
+  const snapshot = gameState.serialize();
+  gameState.reset();
+  assert.equal(gameState.deserialize(snapshot), true);
+  assert.equal(gameState.achievements.first_wash, true);
+  const beforeSecondWash = gameState.money;
+  const second = gameState.addCar('compact');
+  assert.ok(second);
+  assert.equal(gameState.assignCarToPost(second.id, 'post_1'), true);
+  gameState.addServiceIncome(second.id, 0.75);
+  assert.equal(gameState.money, beforeSecondWash + 370);
+});
+
+test('28. Окупаемость учитывает средний расход химии по парку и улучшения', () => {
+  gameState.initNewGame('roadside');
+  const baseCost = gameState.getAverageSupplyCost();
+  assert.ok(baseCost > BALANCE.services.expressWash.supplyCost);
+  assert.ok(baseCost < BALANCE.services.expressWash.supplyCost * 1.3);
+  gameState.upgrades.supplyEfficiency = 1;
+  const upgradedCost = gameState.getAverageSupplyCost();
+  assert.ok(upgradedCost < baseCost);
+  const health = gameState.getBusinessHealth();
+  assert.ok(health.washesToBreakEven > 0);
+});
+
+test('27. Сводка здоровья бизнеса считает аренду, материалы, окупаемость и занятость', () => {
+  gameState.initNewGame('roadside');
+  const health = gameState.getBusinessHealth();
+  assert.equal(health.dailyFixed, 6500);
+  assert.equal(health.unlockedPosts, 2);
+  assert.equal(health.totalPosts, 4);
+  assert.equal(health.brokenPosts, 0);
+  assert.equal(health.occupancy, 0);
+  assert.equal(health.washesToBreakEven, 17);
+  assert.equal(health.moneyRunwayDays, Math.floor(gameState.money / 6500));
+  assert.equal(health.health, 'healthy');
+
+  gameState.posts[0].busy = true;
+  gameState.posts[1].broken = true;
+  gameState.money = -100;
+  const stressed = gameState.getBusinessHealth();
+  assert.equal(stressed.occupancy, 0.5);
+  assert.equal(stressed.brokenPosts, 1);
+  assert.equal(stressed.health, 'critical');
+});
+
+test('26. Открытие третьего бокса меняет состояние и платит достижение', () => {
+  gameState.initNewGame('roadside');
+  const result = gameState.unlockPost('post_3');
+  assert.equal(result.success, true);
+  assert.equal(gameState.posts.find(post => post.id === 'post_3').unlocked, true);
+  assert.equal(gameState.achievements.third_bay, true);
+  assert.equal(gameState.money, 600000 - 450000 + 15000);
+  const snapshot = gameState.serialize();
+  gameState.reset();
+  assert.equal(gameState.deserialize(snapshot), true);
+  assert.equal(gameState.posts.find(post => post.id === 'post_3').unlocked, true);
+  assert.equal(gameState.achievements.third_bay, true);
+});
+
+test('27. Серия идеальных моек начисляет бонус и сохраняет рекорд', () => {
+  gameState.initNewGame('roadside');
+  const moneyBefore = gameState.money;
+  for (let i = 0; i < 3; i++) {
+    const car = gameState.addCar('sedan');
+    assert.ok(car);
+    assert.equal(gameState.assignCarToPost(car.id, 'post_1'), true);
+    gameState.addServiceIncome(car.id, 0.9);
+    gameState.removeCar(car.id);
+  }
+  assert.equal(gameState.perfectWashStreak, 3);
+  assert.equal(gameState.bestPerfectWashStreak, 3);
+  assert.equal(gameState.achievements.perfect_streak_3, true);
+  assert.equal(gameState.money, moneyBefore + 11700);
+  const snapshot = gameState.serialize();
+  gameState.reset();
+  assert.equal(gameState.deserialize(snapshot), true);
+  assert.equal(gameState.perfectWashStreak, 3);
+  assert.equal(gameState.bestPerfectWashStreak, 3);
+  const bad = gameState.addCar('sedan');
+  assert.ok(bad);
+  gameState.assignCarToPost(bad.id, 'post_1');
+  gameState.addServiceIncome(bad.id, 0.6);
+  assert.equal(gameState.perfectWashStreak, 0);
+  assert.equal(gameState.bestPerfectWashStreak, 3);
+});
+
 test('24. Суточный цикл усиливает освещение постов к вечеру', () => {
   const morning = getDayCycleProfile(8);
   const noon = getDayCycleProfile(12);
@@ -465,4 +563,236 @@ test('24. Суточный цикл усиливает освещение пос
   assert.ok(evening.tintAlpha > sunset.tintAlpha);
   assert.ok(evening.lampAlpha > sunset.lampAlpha);
   assert.equal(evening.phase, 'evening');
+});
+
+
+test('25. Обучение сотрудника повышает навык, списывает деньги и блокируется во время работы', () => {
+  gameState.initNewGame('roadside');
+  const hired = gameState.hireEmployee();
+  assert.equal(hired.success, true);
+  const employee = hired.employee;
+  const initialSpeed = employee.speed;
+  const initialMoney = gameState.money;
+
+  const trained = gameState.trainEmployee(employee.id, 'speed');
+  assert.equal(trained.success, true);
+  assert.equal(employee.speed, Math.min(1, Math.round((initialSpeed + 0.05) * 100) / 100));
+  assert.equal(gameState.money, initialMoney - 20_000);
+
+  employee.status = 'working';
+  const blocked = gameState.trainEmployee(employee.id, 'quality');
+  assert.equal(blocked.success, false);
+  assert.match(blocked.reason, /занят/i);
+  assert.equal(employee.quality, BALANCE.employee.baseQuality);
+});
+
+
+test('29. Профилактика оборудования восстанавливает ресурс, списывает деньги и сохраняется', () => {
+  gameState.initNewGame('roadside');
+  const post = gameState.posts[0];
+  post.maintenance = 52;
+  const moneyBefore = gameState.money;
+
+  const result = gameState.servicePost(post.id);
+  assert.equal(result.success, true);
+  assert.equal(post.maintenance, 87);
+  assert.equal(gameState.money, moneyBefore - 12_000);
+
+  const blockedBusy = (() => {
+    post.busy = true;
+    return gameState.servicePost(post.id);
+  })();
+  assert.equal(blockedBusy.success, false);
+  assert.match(blockedBusy.reason, /мойки/i);
+  post.busy = false;
+
+  const saved = gameState.serialize();
+  gameState.reset();
+  assert.equal(gameState.deserialize(saved), true);
+  assert.equal(gameState.posts[0].maintenance, 87);
+});
+
+test('30. Профилактика не обслуживает неисправный или полностью исправный бокс', () => {
+  gameState.initNewGame('roadside');
+  const post = gameState.posts[0];
+  assert.equal(gameState.servicePost(post.id).reason, 'Оборудование уже обслужено');
+  post.broken = true;
+  assert.equal(gameState.servicePost(post.id).success, false);
+});
+
+
+test('31. Специализация сотрудника управляет ролью и сохраняется в сохранении', () => {
+  gameState.initNewGame('roadside');
+  const hired = gameState.hireEmployee();
+  assert.equal(hired.success, true);
+  const emp = hired.employee;
+
+  assert.equal(gameState.setEmployeeRole(emp.id, 'mechanic').success, true);
+  assert.equal(emp.role, 'mechanic');
+
+  const saved = gameState.serialize();
+  gameState.reset();
+  assert.equal(gameState.deserialize(saved), true);
+  assert.equal(gameState.employees[0].role, 'mechanic');
+});
+
+test('32. Нельзя менять роль занятого сотрудника или назначать неизвестную роль', () => {
+  gameState.initNewGame('roadside');
+  const emp = gameState.hireEmployee().employee;
+  assert.equal(gameState.setEmployeeRole(emp.id, 'driver').success, false);
+  emp.status = 'working';
+  const result = gameState.setEmployeeRole(emp.id, 'washer');
+  assert.equal(result.success, false);
+  assert.match(result.reason, /занят/i);
+});
+
+
+test('33. Дополнительные услуги увеличивают выручку и учитывают расход материалов', () => {
+  gameState.initNewGame('roadside');
+  const car = gameState.addCar('sedan');
+  assert.ok(car);
+  const baseNet = gameState.servicePrice - BALANCE.services.expressWash.supplyCost;
+  assert.equal(gameState.toggleExtraService('wax', true).success, true);
+  assert.equal(gameState.toggleExtraService('interior', true).success, true);
+
+  const moneyBefore = gameState.money;
+  const net = gameState.addServiceIncome(car.id, 0.7);
+  assert.equal(net, baseNet + (250 + 450) - (70 + 120));
+  assert.equal(gameState.money, moneyBefore + net + 2500); // first-wash career achievement
+  assert.ok(gameState.financialLog.some(item => item.description === 'Мойка Седан'));
+  assert.equal(gameState.selectedExtras.length, 2);
+});
+
+test('34. Каталог дополнительных услуг сохраняется и отклоняет неизвестные позиции', () => {
+  gameState.initNewGame('roadside');
+  assert.equal(gameState.toggleExtraService('polish', true).success, true);
+  assert.equal(gameState.toggleExtraService('unknown', true).success, false);
+
+  const snapshot = gameState.serialize();
+  gameState.reset();
+  assert.equal(gameState.deserialize(snapshot), true);
+  assert.deepEqual(gameState.selectedExtras, ['polish']);
+});
+
+
+test('Конкурентный демпинг оставляет около 12% базового потока', () => {
+  gameState.initNewGame('roadside');
+  gameState.servicePrice = 500;
+  gameState.reputation = 50;
+  gameState.competitorPriceWar = true;
+  assert.equal(gameState.getDemandMultiplier(), 0.12);
+});
+
+test('Состояние истории конкурента сохраняется и восстанавливается', () => {
+  gameState.initNewGame('roadside');
+  gameState.competitorActive = true;
+  gameState.competitorPriceWar = false;
+  gameState.competitorBrokenBays = 2;
+  gameState.competitorClosed = true;
+  gameState.competitorAcquired = true;
+  gameState.posts[2].unlocked = true;
+  gameState.posts[3].unlocked = true;
+  gameState.setStoryFlag('competitor_acquired');
+
+  const saved = gameState.serialize();
+  gameState.reset();
+  assert.equal(gameState.deserialize(saved), true);
+
+  assert.equal(gameState.competitorActive, true);
+  assert.equal(gameState.competitorBrokenBays, 2);
+  assert.equal(gameState.competitorClosed, true);
+  assert.equal(gameState.competitorAcquired, true);
+  assert.equal(gameState.posts[2].unlocked, true);
+  assert.equal(gameState.posts[3].unlocked, true);
+  assert.equal(gameState.hasStoryFlag('competitor_acquired'), true);
+});
+
+test('Выкуп точки конкурента атомарно списывает деньги и открывает два исправных бокса', () => {
+  gameState.initNewGame('roadside');
+  const price = BALANCE.competitor.buyoutPrice;
+  gameState.competitorClosed = true;
+  gameState.money = price - 1;
+
+  const rejected = gameState.acquireCompetitorAssets();
+  assert.equal(rejected.success, false);
+  assert.equal(rejected.reason, 'Недостаточно средств');
+  assert.equal(gameState.money, price - 1);
+  assert.equal(gameState.posts[2].unlocked, false);
+  assert.equal(gameState.competitorAcquired, false);
+
+  gameState.money = price + 250_000;
+  gameState.posts[2].broken = true;
+  gameState.posts[2].maintenance = 12;
+  gameState.posts[3].broken = true;
+  gameState.posts[3].maintenance = 0;
+  const expensesBefore = gameState.stats.totalExpenses;
+  const todayExpensesBefore = gameState.stats.todayExpenses;
+
+  const acquired = gameState.acquireCompetitorAssets();
+  assert.equal(acquired.success, true);
+  assert.equal(gameState.money, 250_000);
+  assert.equal(gameState.stats.totalExpenses, expensesBefore + price);
+  assert.equal(gameState.stats.todayExpenses, todayExpensesBefore + price);
+  assert.equal(gameState.competitorAcquired, true);
+  assert.equal(gameState.hasStoryFlag('competitor_acquired'), true);
+  for (const post of gameState.posts.slice(2)) {
+    assert.equal(post.unlocked, true);
+    assert.equal(post.broken, false);
+    assert.equal(post.maintenance, 100);
+    assert.equal(post.busy, false);
+    assert.equal(post.carId, null);
+  }
+  assert.equal(gameState.acquireCompetitorAssets().success, false);
+});
+
+test('Продажа бизнеса корректно отражается в общей и дневной выручке', () => {
+  gameState.initNewGame('roadside');
+  const price = BALANCE.competitor.buyoutPrice;
+  const revenueBefore = gameState.stats.totalRevenue;
+  const todayRevenueBefore = gameState.stats.todayRevenue;
+  const sale = gameState.acceptBusinessBuyout();
+
+  assert.equal(sale.success, true);
+  assert.equal(sale.price, price);
+  assert.equal(gameState.money, 600_000 + price);
+  assert.equal(gameState.stats.totalRevenue, revenueBefore + price);
+  assert.equal(gameState.stats.todayRevenue, todayRevenueBefore + price);
+  assert.equal(gameState.buyoutAccepted, true);
+  assert.equal(gameState.acceptBusinessBuyout().success, false);
+});
+
+test('Филиал открывается отдельно, получает управляющего и ведёт автономную экономику', () => {
+  gameState.initNewGame('roadside');
+  assert.equal(gameState.openBranch('residential').success, false);
+  gameState.competitorAcquired = true;
+  gameState.money = 3_000_000;
+  const result = gameState.openBranch('residential');
+  assert.equal(result.success, true);
+  assert.equal(gameState.money, 600_000);
+  assert.equal(gameState.openBranch('residential').success, false);
+  assert.equal(gameState.assignBranchManager(result.branch.id, 'Иван Петров').success, true);
+  // The default 500 ₽ price cannot cover the manager, rent, utilities, and supplies.
+  // Set a viable price before asserting that the managed branch earns a profit.
+  result.branch.servicePrice = 2500;
+  const before = gameState.money;
+  const profit = gameState.settleBranchesDaily();
+  assert.ok(profit > 0);
+  assert.ok(gameState.money > before);
+  assert.equal(result.branch.totalCars, 6);
+  assert.equal(result.branch.suppliesStock, 94);
+  const saved = gameState.serialize();
+  gameState.reset();
+  assert.equal(gameState.deserialize(saved), true);
+  assert.equal(gameState.branches[0].manager, 'Иван Петров');
+  assert.equal(gameState.branches[0].totalCars, 6);
+});
+test('Филиал без управляющего ограничен потоком и складом химии', () => {
+  gameState.initNewGame('roadside');
+  gameState.competitorAcquired = true;
+  gameState.money = 3_000_000;
+  const branch = gameState.openBranch('business').branch;
+  branch.suppliesStock = 2;
+  gameState.settleBranchesDaily();
+  assert.equal(branch.totalCars, 2);
+  assert.equal(branch.suppliesStock, 0);
 });

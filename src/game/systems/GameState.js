@@ -10,6 +10,20 @@ function genId(prefix = 'op') {
   return `${prefix}_${Date.now()}_${_nextId++}`;
 }
 
+const CAREER_ACHIEVEMENTS = [
+  { id: 'first_wash', title: 'Первый клиент', description: 'Заверши первую мойку', metric: 'totalCarsWashed', target: 1, reward: 2500 },
+  { id: 'ten_washes', title: 'Стабильный поток', description: 'Обслужи 10 автомобилей за карьеру', metric: 'totalCarsWashed', target: 10, reward: 10000 },
+  { id: 'twentyfive_washes', title: 'Мастер смены', description: 'Обслужи 25 автомобилей за карьеру', metric: 'totalCarsWashed', target: 25, reward: 25000 },
+  { id: 'perfect_five', title: 'Чистая работа', description: 'Получи 5 оценок за идеальную мойку', metric: 'totalPerfectWashes', target: 5, reward: 10000 },
+  { id: 'perfect_twenty', title: 'Стандарт премиум', description: 'Получи 20 оценок за идеальную мойку', metric: 'totalPerfectWashes', target: 20, reward: 40000 },
+  { id: 'perfect_streak_3', title: 'На волне качества', description: 'Сделай 3 идеальные мойки подряд', metric: 'bestPerfectWashStreak', target: 3, reward: 7500 },
+  { id: 'perfect_streak_6', title: 'Золотая серия', description: 'Сделай 6 идеальных моек подряд', metric: 'bestPerfectWashStreak', target: 6, reward: 20000 },
+  { id: 'third_bay', title: 'Больше мощности', description: 'Открой третий моечный бокс', metric: 'openBays', target: 3, reward: 15000 },
+  { id: 'four_bays', title: 'Своя мини-сеть', description: 'Открой все 4 моечных бокса', metric: 'openBays', target: 4, reward: 50000 },
+  { id: 'reputation_75', title: 'Имя на районе', description: 'Подними репутацию до 75', metric: 'reputation', target: 75, reward: 12000 },
+  { id: 'reputation_90', title: 'Городской фаворит', description: 'Подними репутацию до 90', metric: 'reputation', target: 90, reward: 30000 },
+];
+
 class GameState {
   constructor() {
     this.reset();
@@ -27,6 +41,9 @@ class GameState {
     this.location = null;
     this.equipmentType = 'used'; // 'used', 'newStandard', 'premiumAuto'
     this.reputation = BALANCE.reputation.initial;
+    this.achievements = {};
+    this.perfectWashStreak = 0;
+    this.bestPerfectWashStreak = 0;
 
     // Оформленные документы
     this.documents = {
@@ -48,14 +65,18 @@ class GameState {
     this.cars = [];
     this.queue = [];
     this.posts = [
-      { id: 'post_1', busy: false, carId: null, broken: false },
-      { id: 'post_2', busy: false, carId: null, broken: false },
+      { id: 'post_1', busy: false, carId: null, broken: false, unlocked: true, maintenance: 100 },
+      { id: 'post_2', busy: false, carId: null, broken: false, unlocked: true, maintenance: 100 },
+      { id: 'post_3', busy: false, carId: null, broken: false, unlocked: false, maintenance: 100 },
+      { id: 'post_4', busy: false, carId: null, broken: false, unlocked: false, maintenance: 100 },
     ];
 
     this.servicePrice = BALANCE.services.expressWash.basePrice;
+    this.selectedExtras = [];
 
     this.stats = {
       totalCarsWashed: 0,
+      totalPerfectWashes: 0,
       totalRevenue: 0,
       totalExpenses: 0,
       todayCarsWashed: 0,
@@ -80,6 +101,11 @@ class GameState {
     this.competitorPriceWar = false;
     this.buyoutOffered = false;
     this.buyoutAccepted = false;
+    this.competitorBrokenBays = 0;
+    this.competitorClosed = false;
+    this.competitorAcquired = false;
+    this.branches = [];
+    this.branchSequence = 1;
 
     this.settings = {
       soundEnabled: true,
@@ -174,17 +200,41 @@ class GameState {
     return { success: true, newStock: this.suppliesStock };
   }
 
+  getExtraServiceCatalog() {
+    return [
+      { id: 'wax', name: 'Жидкий воск', price: 250, cost: 70, description: 'Защита кузова и блеск' },
+      { id: 'interior', name: 'Уборка салона', price: 450, cost: 120, description: 'Пылесос и очистка пластика' },
+      { id: 'polish', name: 'Экспресс-полировка', price: 700, cost: 220, description: 'Блеск лакокрасочного покрытия' },
+    ];
+  }
+
+  toggleExtraService(serviceId, enabled) {
+    const service = this.getExtraServiceCatalog().find(item => item.id === serviceId);
+    if (!service) return { success: false, reason: 'Услуга не найдена' };
+    const selected = new Set(this.selectedExtras || []);
+    if (enabled) selected.add(serviceId);
+    else selected.delete(serviceId);
+    this.selectedExtras = [...selected];
+    this.emit('stateChanged');
+    return { success: true, selectedExtras: [...this.selectedExtras] };
+  }
+
   /** Доход за оказанную услугу */
   addServiceIncome(carId, quality) {
     const car = this.cars.find(c => c.id === carId);
     if (!car || car.paid) return 0;
 
     const carClass = BALANCE.carClasses[car.carClass];
-    const price = Math.round(this.servicePrice * carClass.priceMultiplier);
+    const basePrice = Math.round(this.servicePrice * carClass.priceMultiplier);
+    const extras = this.getExtraServiceCatalog().filter(item => (this.selectedExtras || []).includes(item.id));
+    const extraRevenue = extras.reduce((sum, item) => sum + item.price, 0);
+    const price = basePrice + extraRevenue;
     const supplyCostMult = this.getUpgradeEffect('supplyEfficiency', 1);
-    const supplyCost = Math.round(
+    const baseSupplyCost = Math.round(
       BALANCE.services.expressWash.supplyCost * carClass.supplyCostMultiplier * supplyCostMult
     );
+    const extraSupplyCost = extras.reduce((sum, item) => sum + item.cost, 0);
+    const supplyCost = baseSupplyCost + extraSupplyCost;
 
     this.money += price;
     this.money -= supplyCost;
@@ -206,15 +256,55 @@ class GameState {
     this._logFinance('income', `Мойка ${carClass.name}`, price);
     this._logFinance('expense', `Материалы (${carClass.name})`, supplyCost);
 
+    let streakBonus = 0;
     if (quality >= 0.85) {
       this.stats.todayPerfectWashes++;
+      this.stats.totalPerfectWashes = (this.stats.totalPerfectWashes || 0) + 1;
+      this.perfectWashStreak = (this.perfectWashStreak || 0) + 1;
+      this.bestPerfectWashStreak = Math.max(this.bestPerfectWashStreak || 0, this.perfectWashStreak);
+      car.perfectWashStreak = this.perfectWashStreak;
+      if (this.perfectWashStreak % 3 === 0) {
+        streakBonus = Math.min(2500, (this.perfectWashStreak / 3) * 500);
+        this.money += streakBonus;
+        this.stats.totalRevenue += streakBonus;
+        this.stats.todayRevenue += streakBonus;
+        this._logFinance('income', 'Серия идеальных моек ×' + this.perfectWashStreak, streakBonus);
+        car.perfectStreakBonus = streakBonus;
+        this.emit('perfectStreakBonus', { streak: this.perfectWashStreak, bonus: streakBonus, carId });
+      }
       this.changeReputation(BALANCE.reputation.goodServiceBonus);
-    } else if (quality < 0.5) {
-      this.changeReputation(BALANCE.reputation.poorServicePenalty);
+    } else {
+      this.perfectWashStreak = 0;
+      car.perfectWashStreak = 0;
+      if (quality < 0.5) this.changeReputation(BALANCE.reputation.poorServicePenalty);
     }
 
+    this._checkCareerAchievements();
     this.emit('stateChanged');
     return price - supplyCost;
+  }
+
+  getAverageSupplyCost() {
+    const averageMultiplier = Object.values(BALANCE.carClasses).reduce((sum, item) => sum + item.supplyCostMultiplier, 0) / Math.max(1, Object.keys(BALANCE.carClasses).length);
+    return Math.round(BALANCE.services.expressWash.supplyCost * averageMultiplier * this.getUpgradeEffect('supplyEfficiency', 1));
+  }
+
+  getBusinessHealth() {
+    const location = this.getLocation();
+    const unlockedPosts = this.posts.filter(post => post.unlocked !== false);
+    const dailyPayroll = this.employees.length * BALANCE.employee.dailySalary;
+    const dailyFixed = (location?.dailyRent || 0) + BALANCE.dailyCosts.utilities + dailyPayroll;
+    const avgWashMargin = Math.round(this.servicePrice - this.getAverageSupplyCost());
+    const todayProfit = (Number(this.stats.todayRevenue) || 0) - (Number(this.stats.todayExpenses) || 0);
+    return {
+      dailyFixed, dailyPayroll, todayProfit,
+      washesToBreakEven: avgWashMargin > 0 ? Math.ceil(dailyFixed / avgWashMargin) : null,
+      moneyRunwayDays: dailyFixed > 0 ? Math.floor(this.money / dailyFixed) : null,
+      unlockedPosts: unlockedPosts.length, totalPosts: this.posts.length,
+      brokenPosts: unlockedPosts.filter(post => post.broken).length,
+      occupancy: unlockedPosts.length ? unlockedPosts.filter(post => post.busy).length / unlockedPosts.length : 0,
+      health: this.money < 0 ? 'critical' : this.money < dailyFixed * 3 ? 'warning' : 'healthy',
+    };
   }
 
   /** Ежедневные расходы (конец смены) */
@@ -230,6 +320,7 @@ class GameState {
     }
 
     const total = rent + utilities + salaries;
+    this.settleBranchesDaily();
 
     this.money -= total;
     this.stats.totalExpenses += total;
@@ -294,6 +385,138 @@ class GameState {
     return { success: true, newLevel: currentLevel + 1 };
   }
 
+  getCareerAchievements() {
+    const openBays = this.posts.filter(post => post.unlocked !== false).length;
+    return CAREER_ACHIEVEMENTS.map(item => {
+      let value = 0;
+      if (item.metric === 'openBays') value = openBays;
+      else if (item.metric === 'reputation') value = Math.round(this.reputation);
+      else if (item.metric === 'bestPerfectWashStreak') value = Number(this.bestPerfectWashStreak) || 0;
+      else value = Number(this.stats[item.metric]) || 0;
+      return { ...item, progress: Math.min(item.target, value), unlocked: !!this.achievements[item.id] };
+    });
+  }
+
+  _checkCareerAchievements() {
+    const newlyUnlocked = [];
+    for (const achievement of this.getCareerAchievements()) {
+      if (achievement.unlocked || achievement.progress < achievement.target) continue;
+      this.achievements[achievement.id] = true;
+      this.money += achievement.reward;
+      this.stats.totalRevenue += achievement.reward;
+      this._logFinance('income', 'Достижение: ' + achievement.title, achievement.reward);
+      newlyUnlocked.push({ ...achievement, unlocked: true });
+    }
+    for (const achievement of newlyUnlocked) this.emit('achievementUnlocked', achievement);
+    if (newlyUnlocked.length) this.emit('stateChanged');
+    return newlyUnlocked;
+  }
+
+  /** Открыть новый моечный бокс за счёт средств бизнеса. */
+  unlockPost(postId) {
+    const post = this.posts.find(p => p.id === postId);
+    const costs = { post_3: 450000, post_4: 900000 };
+    const price = costs[postId];
+    if (!post || !price) return { success: false, reason: 'Бокс не найден' };
+    if (post.unlocked !== false) return { success: false, reason: 'Бокс уже открыт' };
+    if (postId === 'post_4' && this.posts.some(p => p.id === 'post_3' && !p.unlocked)) return { success: false, reason: 'Сначала открой третий бокс' };
+    if (this.money < price) return { success: false, reason: 'Недостаточно средств' };
+    this.money -= price;
+    post.unlocked = true;
+    this.stats.totalExpenses += price;
+    this.stats.todayExpenses += price;
+    this._logFinance('expense', 'Открытие ' + (postId === 'post_3' ? 'третьего' : 'четвёртого') + ' бокса', price);
+    this._checkCareerAchievements();
+    this.emit('stateChanged');
+    return { success: true, postId, price };
+  }
+
+
+  openBranch(locationId = 'residential') {
+    const location = BALANCE.locations[locationId];
+    const price = BALANCE.branch.purchasePrice;
+    if (!location) return { success: false, reason: 'Неизвестная локация' };
+    if (!this.competitorAcquired) return { success: false, reason: 'Сначала выкупи активы «КлинАвто»' };
+    if (this.branches.length >= BALANCE.branch.maxBranches) return { success: false, reason: 'Достигнут лимит филиалов' };
+    if (this.branches.some(item => item.locationId === locationId)) return { success: false, reason: 'В этой локации уже есть филиал' };
+    if (this.money < price) return { success: false, reason: 'Недостаточно средств', missing: price - this.money };
+    const branch = { id: 'branch_' + this.branchSequence++, name: location.name, locationId, manager: '', employees: 0, bays: 2, servicePrice: 500, reputation: 50, suppliesStock: 100, totalCars: 0, totalRevenue: 0, totalExpenses: 0, lastDayProfit: 0 };
+    this.money -= price; this.stats.totalExpenses += price; this.stats.todayExpenses += price;
+    this._logFinance('expense', 'Открытие филиала: ' + location.name, price);
+    this.branches.push(branch); this.emit('stateChanged');
+    return { success: true, branch, price };
+  }
+
+  assignBranchManager(branchId, managerName) {
+    const branch = this.branches.find(item => item.id === branchId);
+    const name = String(managerName || '').trim();
+    if (!branch) return { success: false, reason: 'Филиал не найден' };
+    if (name.length < 2 || name.length > 40) return { success: false, reason: 'Имя управляющего должно содержать 2–40 символов' };
+    branch.manager = name; this.emit('stateChanged');
+    return { success: true, branch };
+  }
+
+  settleBranchesDaily() {
+    let networkProfit = 0;
+    for (const branch of this.branches) {
+      const location = BALANCE.locations[branch.locationId];
+      const managed = !!branch.manager;
+      const cars = Math.min(branch.bays * (managed ? 7 : 3), Math.round(8 * location.customerFlow * branch.reputation / 50), branch.suppliesStock);
+      const revenue = Math.round(cars * branch.servicePrice * location.avgCheckMultiplier);
+      const supplies = cars * 100;
+      const fixed = location.dailyRent + BALANCE.dailyCosts.utilities + branch.employees * BALANCE.employee.dailySalary + (managed ? BALANCE.branch.managerSalary : 0);
+      const profit = revenue - supplies - fixed;
+      branch.suppliesStock -= cars; branch.totalCars += cars; branch.totalRevenue += revenue;
+      branch.totalExpenses += supplies + fixed; branch.lastDayProfit = profit; this.money += profit;
+      this.stats.totalRevenue += revenue; this.stats.totalExpenses += supplies + fixed;
+      this.stats.todayRevenue += revenue; this.stats.todayExpenses += supplies + fixed;
+      this._logFinance(profit >= 0 ? 'income' : 'expense', branch.name + ': ' + cars + ' машин за смену', Math.abs(profit));
+      networkProfit += profit;
+    }
+    if (this.branches.length) this.emit('stateChanged');
+    return networkProfit;
+  }
+
+  /** Продажа бизнеса по сюжетному предложению конкурента. */
+  acceptBusinessBuyout() {
+    if (this.buyoutAccepted) return { success: false, reason: 'Предложение уже принято' };
+    const price = BALANCE.competitor.buyoutPrice;
+    this.buyoutAccepted = true;
+    this.money += price;
+    this.stats.totalRevenue += price;
+    this.stats.todayRevenue += price;
+    this._logFinance('income', 'Продажа бизнеса «КлинАвто»', price);
+    this.emit('stateChanged');
+    return { success: true, price, balance: this.money };
+  }
+
+  /** Выкуп закрывшейся точки конкурента и восстановление двух постов. */
+  acquireCompetitorAssets() {
+    const price = BALANCE.competitor.buyoutPrice;
+    if (this.competitorAcquired) return { success: false, reason: 'Точка уже приобретена' };
+    if (!this.competitorClosed) return { success: false, reason: 'Точка конкурента ещё не закрыта' };
+    if (this.money < price) return { success: false, reason: 'Недостаточно средств', missing: price - this.money };
+
+    const expansionPosts = ['post_3', 'post_4'].map(id => this.posts.find(post => post.id === id));
+    if (expansionPosts.some(post => !post)) return { success: false, reason: 'Не удалось найти дополнительные боксы' };
+
+    this.money -= price;
+    this.stats.totalExpenses += price;
+    this.stats.todayExpenses += price;
+    this._logFinance('expense', 'Покупка оборудования «КлинАвто»', price);
+    for (const post of expansionPosts) {
+      post.unlocked = true;
+      post.broken = false;
+      post.busy = false;
+      post.carId = null;
+      post.maintenance = 100;
+    }
+    this.competitorAcquired = true;
+    this.setStoryFlag('competitor_acquired');
+    this.emit('stateChanged');
+    return { success: true, price, unlockedPosts: expansionPosts.map(post => post.id) };
+  }
+
   /** Получить эффект улучшения */
   getUpgradeEffect(upgradeId, defaultValue = 1) {
     const def = BALANCE.upgrades[upgradeId];
@@ -320,6 +543,44 @@ class GameState {
     this.employees.push(emp);
     this.emit('stateChanged');
     return { success: true, employee: emp };
+  }
+
+  /** Назначить специализацию сотрудника: универсал, мойщик или техник. */
+  setEmployeeRole(empId, role) {
+    const emp = this.employees.find(item => item.id === empId);
+    if (!emp) return { success: false, reason: 'Сотрудник не найден' };
+    if (!['generalist', 'washer', 'mechanic'].includes(role)) {
+      return { success: false, reason: 'Неизвестная специализация' };
+    }
+    if (emp.status === 'working' || emp.status === 'repairing') {
+      return { success: false, reason: 'Сотрудник занят. Назначение изменится после завершения задачи.' };
+    }
+    emp.role = role;
+    this.emit('stateChanged');
+    return { success: true, employee: emp };
+  }
+
+  /** Обучить сотрудника: повысить скорость или качество обслуживания. */
+  trainEmployee(empId, skill) {
+    const emp = this.employees.find(item => item.id === empId);
+    if (!emp) return { success: false, reason: 'Сотрудник не найден' };
+    if (emp.status === 'working' || emp.status === 'repairing') {
+      return { success: false, reason: 'Сотрудник занят. Дождись окончания работы.' };
+    }
+    if (skill !== 'speed' && skill !== 'quality') {
+      return { success: false, reason: 'Неизвестный навык' };
+    }
+    const current = Number(emp[skill]) || 0;
+    if (current >= 1) return { success: false, reason: 'Навык уже достиг максимума' };
+    const cost = skill === 'speed' ? 20_000 : 15_000;
+    if (this.money < cost) return { success: false, reason: 'Недостаточно средств для обучения' };
+    emp[skill] = Math.min(1, Math.round((current + 0.05) * 100) / 100);
+    this.money -= cost;
+    this.stats.totalExpenses += cost;
+    this.stats.todayExpenses += cost;
+    this._logFinance('expense', `Обучение сотрудника: ${skill === 'speed' ? 'скорость' : 'качество'}`, cost);
+    this.emit('stateChanged');
+    return { success: true, employee: emp, cost };
   }
 
   /** Уволить сотрудника */
@@ -387,7 +648,7 @@ class GameState {
   assignCarToPost(carId, postId) {
     const car = this.getCar(carId);
     const post = this.posts.find(p => p.id === postId);
-    if (!car || !post || post.busy || post.broken) return false;
+    if (!car || !post || post.unlocked === false || post.busy || post.broken) return false;
 
     post.busy = true;
     post.carId = carId;
@@ -475,9 +736,18 @@ class GameState {
     this.money += stored.reward;
     this.stats.totalRevenue += stored.reward;
     this._logFinance('income', `Награда за контракт «${stored.title}»`, stored.reward);
+
+    // The third claimed daily contract unlocks a one-time bonus for this day.
+    const allClaimed = this.dailyContracts.length === 3 && this.dailyContracts.every(item => item.claimed);
+    const bonus = allClaimed ? 15000 : 0;
+    if (bonus > 0) {
+      this.money += bonus;
+      this.stats.totalRevenue += bonus;
+      this._logFinance('income', 'Бонус за все контракты дня', bonus);
+    }
     this.emit('stateChanged');
 
-    return { success: true, reward: stored.reward, title: stored.title };
+    return { success: true, reward: stored.reward, bonus, title: stored.title };
   }
 
   nextDay() {
@@ -507,6 +777,7 @@ class GameState {
       BALANCE.reputation.min,
       Math.min(BALANCE.reputation.max, this.reputation + amount)
     );
+    this._checkCareerAchievements();
   }
 
   startMarketing() {
@@ -588,6 +859,25 @@ class GameState {
     return true;
   }
 
+  /** Профилактика снижает риск поломки и восстанавливает ресурс оборудования. */
+  servicePost(postId) {
+    const post = this.posts.find(p => p.id === postId);
+    if (!post || post.unlocked === false) return { success: false, reason: 'Бокс недоступен' };
+    if (post.broken) return { success: false, reason: 'Сначала отремонтируй неисправный бокс' };
+    if (post.busy) return { success: false, reason: 'Дождись окончания мойки в этом боксе' };
+    const current = Number.isFinite(post.maintenance) ? post.maintenance : 100;
+    if (current >= 100) return { success: false, reason: 'Оборудование уже обслужено' };
+    const cost = 12_000;
+    if (this.money < cost) return { success: false, reason: 'Недостаточно средств для обслуживания' };
+    post.maintenance = Math.min(100, current + 35);
+    this.money -= cost;
+    this.stats.totalExpenses += cost;
+    this.stats.todayExpenses += cost;
+    this._logFinance('expense', 'Профилактика оборудования · ' + postId.replace('post_', 'бокс '), cost);
+    this.emit('stateChanged');
+    return { success: true, maintenance: post.maintenance, cost };
+  }
+
   repairPost(postId) {
     const post = this.posts.find(p => p.id === postId);
     if (!post || !post.broken) return { success: false, reason: 'Бокс исправен' };
@@ -598,6 +888,7 @@ class GameState {
     this.stats.todayExpenses += cost;
     this._logFinance('expense', `Ремонт бокса`, cost);
     post.broken = false;
+    post.maintenance = 100;
     this.emit('stateChanged');
     return { success: true };
   }
@@ -655,9 +946,13 @@ class GameState {
       documents: { ...this.documents },
       suppliesStock: this.suppliesStock,
       reputation: this.reputation,
+      achievements: { ...this.achievements },
+      perfectWashStreak: this.perfectWashStreak,
+      bestPerfectWashStreak: this.bestPerfectWashStreak,
       upgrades: { ...this.upgrades },
       employees: this.employees.map(e => ({ ...e })),
       servicePrice: this.servicePrice,
+      selectedExtras: [...(this.selectedExtras || [])],
       stats: { ...this.stats },
       dailyContractDay: this.dailyContractDay,
       dailyContracts: this.dailyContracts.map(contract => ({ ...contract })),
@@ -673,8 +968,13 @@ class GameState {
       competitorPriceWar: this.competitorPriceWar,
       buyoutOffered: this.buyoutOffered,
       buyoutAccepted: this.buyoutAccepted,
+      competitorBrokenBays: this.competitorBrokenBays,
+      competitorClosed: this.competitorClosed,
+      competitorAcquired: this.competitorAcquired,
+      branches: this.branches.map(branch => ({ ...branch })),
+      branchSequence: this.branchSequence,
       settings: { ...this.settings },
-      posts: this.posts.map(p => ({ id: p.id, broken: p.broken })),
+      posts: this.posts.map(p => ({ id: p.id, broken: p.broken, unlocked: p.unlocked !== false, maintenance: Number.isFinite(p.maintenance) ? p.maintenance : 100 })),
     };
   }
 
@@ -712,6 +1012,8 @@ class GameState {
 
     this.employees = Array.isArray(data.employees) ? data.employees : [];
     this.servicePrice = typeof data.servicePrice === 'number' ? data.servicePrice : BALANCE.services.expressWash.basePrice;
+    const validExtras = new Set(this.getExtraServiceCatalog().map(item => item.id));
+    this.selectedExtras = Array.isArray(data.selectedExtras) ? [...new Set(data.selectedExtras.filter(id => validExtras.has(id)))] : [];
 
     if (data.stats) this.stats = { ...this.stats, ...data.stats };
     if (Array.isArray(data.financialLog)) this.financialLog = data.financialLog;
@@ -727,12 +1029,36 @@ class GameState {
     this.competitorPriceWar = !!data.competitorPriceWar;
     this.buyoutOffered = !!data.buyoutOffered;
     this.buyoutAccepted = !!data.buyoutAccepted;
+    this.competitorBrokenBays = Math.max(0, Math.min(2, Number(data.competitorBrokenBays) || 0));
+    this.competitorClosed = !!data.competitorClosed;
+    this.competitorAcquired = !!data.competitorAcquired;
+    this.branches = Array.isArray(data.branches) ? data.branches.filter(b => b && typeof b.id === 'string' && BALANCE.locations[b.locationId]).map(b => ({
+      id: b.id, name: String(b.name || 'Филиал'), locationId: b.locationId, manager: String(b.manager || ''),
+      employees: Math.max(0, Math.min(4, Math.floor(Number(b.employees) || 0))),
+      bays: Math.max(1, Math.min(4, Math.floor(Number(b.bays) || 2))),
+      servicePrice: Math.max(100, Math.min(2000, Number(b.servicePrice) || 500)),
+      reputation: Math.max(0, Math.min(100, Number(b.reputation) || 50)),
+      suppliesStock: Math.max(0, Math.floor(Number(b.suppliesStock) || 0)),
+      totalCars: Math.max(0, Math.floor(Number(b.totalCars) || 0)),
+      totalRevenue: Math.max(0, Number(b.totalRevenue) || 0),
+      totalExpenses: Math.max(0, Number(b.totalExpenses) || 0), lastDayProfit: Number(b.lastDayProfit) || 0,
+    })) : [];
+    this.branchSequence = Math.max(1, Math.floor(Number(data.branchSequence) || this.branches.length + 1));
 
+
+    if (data.achievements && typeof data.achievements === 'object') this.achievements = { ...data.achievements };
+    this.perfectWashStreak = Math.max(0, Math.floor(Number(data.perfectWashStreak) || 0));
+    this.bestPerfectWashStreak = Math.max(this.perfectWashStreak, Math.floor(Number(data.bestPerfectWashStreak) || 0));
     if (data.settings) this.settings = { ...this.settings, ...data.settings };
     if (Array.isArray(data.posts)) {
       for (const savedPost of data.posts) {
         const post = this.posts.find(p => p.id === savedPost.id);
-        if (post) post.broken = !!savedPost.broken;
+        if (post) {
+          post.broken = !!savedPost.broken;
+          // Old saves preserve the original two open bays; expansion bays stay locked.
+          if (typeof savedPost.unlocked === 'boolean') post.unlocked = savedPost.unlocked;
+          post.maintenance = Number.isFinite(savedPost.maintenance) ? Math.max(0, Math.min(100, savedPost.maintenance)) : 100;
+        }
       }
     }
 

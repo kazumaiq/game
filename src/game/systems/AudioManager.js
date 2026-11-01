@@ -10,7 +10,11 @@ class AudioManager {
     this.ctx = null;
     this.masterGain = null;
     this.masterVolume = 0.5;
+    this.musicVolume = 0.22;
     this.sfxEnabled = true;
+    this.musicEnabled = true;
+    this.musicGain = null;
+    this._menuAmbience = null;
     this._initialized = false;
     this._activeSpray = null;
     this._lastPlayTimes = {};
@@ -21,6 +25,10 @@ class AudioManager {
       if (savedVol !== null) this.masterVolume = parseFloat(savedVol);
       const savedSfx = localStorage.getItem('carwash_sfx');
       if (savedSfx !== null) this.sfxEnabled = savedSfx === 'true';
+      const savedMusicVol = localStorage.getItem('carwash_music_volume');
+      if (savedMusicVol !== null) this.musicVolume = Math.max(0, Math.min(1, Number(savedMusicVol)));
+      const savedMusic = localStorage.getItem('carwash_music');
+      if (savedMusic !== null) this.musicEnabled = savedMusic === 'true';
     } catch (e) {
       // Игнорируем ошибки доступа к localStorage
     }
@@ -44,6 +52,9 @@ class AudioManager {
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.setValueAtTime(this.sfxEnabled ? this.masterVolume : 0, this.ctx.currentTime);
       this.masterGain.connect(this.ctx.destination);
+      this.musicGain = this.ctx.createGain();
+      this.musicGain.gain.setValueAtTime(this.musicEnabled ? this.musicVolume : 0, this.ctx.currentTime);
+      this.musicGain.connect(this.ctx.destination);
       this._initialized = true;
 
       if (this.ctx.state === 'suspended') {
@@ -64,6 +75,78 @@ class AudioManager {
       const targetGain = this.sfxEnabled ? this.masterVolume : 0;
       this.masterGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.05);
     }
+  }
+
+  setMusicVolume(volume) {
+    this.musicVolume = Math.max(0, Math.min(1, Number(volume) || 0));
+    try { localStorage.setItem('carwash_music_volume', String(this.musicVolume)); } catch (e) {}
+    if (this.musicGain && this.ctx) {
+      this.musicGain.gain.setTargetAtTime(this.musicEnabled ? this.musicVolume : 0, this.ctx.currentTime, 0.08);
+    }
+  }
+
+  toggleMusic() {
+    this.musicEnabled = !this.musicEnabled;
+    try { localStorage.setItem('carwash_music', String(this.musicEnabled)); } catch (e) {}
+    if (this.musicGain && this.ctx) {
+      this.musicGain.gain.setTargetAtTime(this.musicEnabled ? this.musicVolume : 0, this.ctx.currentTime, 0.08);
+    }
+    return this.musicEnabled;
+  }
+
+  /** Тихая кинематографичная амбиент-подложка меню. Запускается только после жеста пользователя. */
+  startMenuAmbience() {
+    this.ensureContext();
+    if (!this.ctx || !this.musicGain || !this.musicEnabled || this._menuAmbience) return;
+    try {
+      const now = this.ctx.currentTime;
+      const bus = this.ctx.createGain();
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(520, now);
+      bus.gain.setValueAtTime(0.0001, now);
+      bus.gain.linearRampToValueAtTime(0.22, now + 2.8);
+      filter.connect(bus);
+      bus.connect(this.musicGain);
+
+      const voices = [55, 82.41, 110, 164.81].map((frequency, index) => {
+        const oscillator = this.ctx.createOscillator();
+        const voiceGain = this.ctx.createGain();
+        oscillator.type = index === 0 ? 'sine' : 'triangle';
+        oscillator.frequency.setValueAtTime(frequency, now);
+        voiceGain.gain.setValueAtTime(index === 0 ? 0.24 : 0.055, now);
+        oscillator.connect(voiceGain);
+        voiceGain.connect(filter);
+        oscillator.start(now);
+        return { oscillator, voiceGain };
+      });
+      const lfo = this.ctx.createOscillator();
+      const lfoGain = this.ctx.createGain();
+      lfo.frequency.setValueAtTime(0.075, now);
+      lfoGain.gain.setValueAtTime(0.035, now);
+      lfo.connect(lfoGain);
+      lfoGain.connect(bus.gain);
+      lfo.start(now);
+      this._menuAmbience = { bus, voices, lfo };
+    } catch (error) {
+      this._menuAmbience = null;
+    }
+  }
+
+  stopMenuAmbience() {
+    if (!this._menuAmbience || !this.ctx) return;
+    const ambience = this._menuAmbience;
+    this._menuAmbience = null;
+    const now = this.ctx.currentTime;
+    try {
+      ambience.bus.gain.cancelScheduledValues(now);
+      ambience.bus.gain.setTargetAtTime(0.0001, now, 0.12);
+      window.setTimeout(() => {
+        ambience.voices.forEach(({ oscillator }) => { try { oscillator.stop(); } catch (e) {} });
+        try { ambience.lfo.stop(); } catch (e) {}
+        try { ambience.bus.disconnect(); } catch (e) {}
+      }, 700);
+    } catch (error) {}
   }
 
   toggleSFX() {
@@ -148,6 +231,9 @@ class AudioManager {
       try {
         this._activeSpray.filter.frequency.setTargetAtTime(freq, this.ctx.currentTime, 0.08);
         this._activeSpray.filter.Q.setTargetAtTime(q, this.ctx.currentTime, 0.08);
+        if (this._activeSpray.airGain) {
+          this._activeSpray.airGain.gain.setTargetAtTime(type === 'foam' ? 0.018 : 0.052, this.ctx.currentTime, 0.1);
+        }
       } catch (e) {}
       return;
     }
@@ -170,16 +256,33 @@ class AudioManager {
       filter.Q.setValueAtTime(q, this.ctx.currentTime);
 
       const gain = this.ctx.createGain();
+      const airFilter = this.ctx.createBiquadFilter();
+      airFilter.type = 'highpass';
+      airFilter.frequency.setValueAtTime(2200, this.ctx.currentTime);
+      const airGain = this.ctx.createGain();
+      const pressureOsc = this.ctx.createOscillator();
+      const pressureGain = this.ctx.createGain();
       const t = this.ctx.currentTime;
       gain.gain.setValueAtTime(0.001, t);
-      gain.gain.linearRampToValueAtTime(0.25, t + 0.06);
+      gain.gain.linearRampToValueAtTime(0.22, t + 0.06);
+      airGain.gain.setValueAtTime(type === 'foam' ? 0.018 : 0.052, t);
+      pressureOsc.type = 'triangle';
+      pressureOsc.frequency.setValueAtTime(type === 'foam' ? 48 : 64, t);
+      pressureGain.gain.setValueAtTime(0.0001, t);
+      pressureGain.gain.linearRampToValueAtTime(0.018, t + 0.12);
 
       noise.connect(filter);
       filter.connect(gain);
       gain.connect(this.masterGain);
+      noise.connect(airFilter);
+      airFilter.connect(airGain);
+      airGain.connect(this.masterGain);
+      pressureOsc.connect(pressureGain);
+      pressureGain.connect(this.masterGain);
 
       noise.start(t);
-      this._activeSpray = { noise, filter, gain };
+      pressureOsc.start(t);
+      this._activeSpray = { noise, filter, gain, airGain, pressureOsc, pressureGain };
     } catch (e) {}
   }
 
@@ -187,13 +290,22 @@ class AudioManager {
   stopSpray() {
     if (!this._activeSpray || !this.ctx) return;
     try {
-      const { noise, gain } = this._activeSpray;
+      const { noise, gain, airGain, pressureOsc, pressureGain } = this._activeSpray;
       const t = this.ctx.currentTime;
       gain.gain.setValueAtTime(gain.gain.value, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      if (airGain) {
+        airGain.gain.setValueAtTime(airGain.gain.value, t);
+        airGain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      }
+      if (pressureGain) {
+        pressureGain.gain.setValueAtTime(pressureGain.gain.value, t);
+        pressureGain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      }
       setTimeout(() => {
         try { noise.stop(); } catch (e) {}
-      }, 100);
+        try { pressureOsc?.stop(); } catch (e) {}
+      }, 140);
     } catch (e) {}
     this._activeSpray = null;
   }

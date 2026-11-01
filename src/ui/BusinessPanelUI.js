@@ -25,6 +25,9 @@ export function showBusinessPanel() {
   const loc = gameState.getLocation();
   const locName = loc ? loc.name : '—';
   const dailyRent = loc ? loc.dailyRent : 0;
+  const businessHealth = gameState.getBusinessHealth();
+  const healthLabel = businessHealth.health === 'critical' ? 'КРИТИЧНО' : businessHealth.health === 'warning' ? 'НУЖЕН РЕЗЕРВ' : 'СТАБИЛЬНО';
+  const healthColor = businessHealth.health === 'critical' ? '#fb7185' : businessHealth.health === 'warning' ? '#fbbf24' : '#4ade9b';
 
   // Раздел документов
   let docsHtml = '';
@@ -49,16 +52,32 @@ export function showBusinessPanel() {
   // Сотрудники
   let empHtml = '';
   for (const emp of gameState.employees) {
-    const statusText = emp.status === 'working' ? 'Работает в боксе' : 'Свободен';
-    const statusClass = emp.status === 'working' ? 'working' : '';
+    const busy = emp.status === 'working' || emp.status === 'repairing';
+    const statusText = emp.status === 'working' ? 'Моет автомобиль' : emp.status === 'repairing' ? 'Обслуживает оборудование' : 'Свободен · готов к работе';
+    const statusClass = busy ? 'working' : '';
+    const speed = Math.round((Number(emp.speed) || 0) * 100);
+    const quality = Math.round((Number(emp.quality) || 0) * 100);
     empHtml += `
       <div class="employee-card">
         <div class="employee-info">
           <div class="name">${emp.name}</div>
           <div class="status ${statusClass}">${statusText}</div>
+          <div style="font-size:11px;color:#94a3b8;">Скорость ${speed}% · Качество ${quality}%</div>
           <div style="font-size:11px;color:#94a3b8;">Зарплата: ${fmt(BALANCE.employee.dailySalary)}/день</div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#9fb4c9;margin-top:8px;">
+            Специализация
+            <select data-employee-role="${emp.id}" ${busy ? 'disabled' : ''} style="flex:1;min-width:0;background:#0b1a2b;color:#e7f5ff;border:1px solid #31516b;border-radius:9px;padding:8px;">
+              <option value="generalist" ${(emp.role || 'generalist') === 'generalist' ? 'selected' : ''}>Универсал</option>
+              <option value="washer" ${emp.role === 'washer' ? 'selected' : ''}>Мойщик</option>
+              <option value="mechanic" ${emp.role === 'mechanic' ? 'selected' : ''}>Техник</option>
+            </select>
+          </label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+            <button class="game-btn" data-train-emp="${emp.id}" data-skill="speed" ${busy || speed >= 100 || gameState.money < 20000 ? 'disabled' : ''}>⚡ Скорость · 20 000 ₽</button>
+            <button class="game-btn" data-train-emp="${emp.id}" data-skill="quality" ${busy || quality >= 100 || gameState.money < 15000 ? 'disabled' : ''}>✦ Качество · 15 000 ₽</button>
+          </div>
         </div>
-        <button class="game-btn danger" data-fire-emp="${emp.id}" style="font-size:11px;padding:4px 8px;">Уволить</button>
+        <button class="game-btn danger" data-fire-emp="${emp.id}" style="font-size:11px;padding:4px 8px;" ${busy ? 'disabled' : ''}>Уволить</button>
       </div>
     `;
   }
@@ -79,6 +98,17 @@ export function showBusinessPanel() {
       <button class="panel-close" id="business-close">✕</button>
       <h2>Управление бизнесом</h2>
 
+      <section class="business-health-card" aria-label="Состояние бизнеса">
+        <div class="business-health-heading"><div><span>ОПЕРАЦИОННАЯ СВОДКА</span><strong>Здоровье бизнеса</strong></div><b style="color:${healthColor}">${healthLabel}</b></div>
+        <div class="business-health-grid">
+          <div><span>Расходы / день</span><strong>${fmt(businessHealth.dailyFixed)}</strong></div>
+          <div><span>Моек до нуля</span><strong>${businessHealth.washesToBreakEven ?? "—"}</strong></div>
+          <div><span>Запас дней</span><strong>${businessHealth.moneyRunwayDays ?? "—"}</strong></div>
+          <div><span>Боксы заняты</span><strong>${Math.round(businessHealth.occupancy * 100)}%</strong></div>
+        </div>
+        <p>${businessHealth.brokenPosts ? `Не работают боксы: ${businessHealth.brokenPosts}.` : "Все открытые боксы доступны для работы."} Следи за тарифом, зарплатами и загрузкой.</p>
+      </section>
+
       <div class="panel-section">
         <h3>Локация и тариф</h3>
         <p style="color:#94a3b8;font-size:12px;">${locName} • Аренда: <strong style="color:#f59e0b;">${fmt(dailyRent)}/день</strong></p>
@@ -91,11 +121,80 @@ export function showBusinessPanel() {
       </div>
 
       <div class="panel-section">
+        <h3>Дополнительные услуги</h3>
+        <p style="color:#94a3b8;font-size:12px;">Выбери услуги, которые будут предлагаться каждому клиенту. Дополнительные материалы автоматически учитываются в себестоимости и прибыли.</p>
+        ${gameState.getExtraServiceCatalog().map(service => {
+          const active = (gameState.selectedExtras || []).includes(service.id);
+          const margin = service.price - service.cost;
+          return '<label class="expansion-card" style="display:flex;align-items:center;gap:12px;cursor:pointer;">' +
+            '<input type="checkbox" data-extra-service="' + service.id + '" ' + (active ? 'checked' : '') + ' style="width:18px;height:18px;accent-color:#38bdf8;flex-shrink:0;">' +
+            '<span class="expansion-copy"><strong>' + service.name + '</strong><span>' + service.description + '</span><small>Цена +' + fmt(service.price) + ' · материалы ' + fmt(service.cost) + ' · маржа +' + fmt(margin) + '</small></span>' +
+            '<span class="expansion-status">' + (active ? 'АКТИВНА' : 'ВЫКЛ') + '</span>' +
+            '</label>';
+        }).join('')}
+      </div>
+
+      <div class="panel-section expansion-section">
+        <h3>Расширение автомойки</h3>
+        <p style="color:#94a3b8;font-size:12px;margin:0 0 10px;">Открывай новые боксы, чтобы обслуживать больше машин параллельно и быстрее выполнять контракты.</p>
+        ${[
+          {id:"post_3",title:"Бокс 3 · Экспресс-линия",desc:"Дополнительное место для клиентов и больше пропускной способности.",price:450000},
+          {id:"post_4",title:"Бокс 4 · Премиум-линия",desc:"Ещё один рабочий пост для роста выручки. Требует открытый бокс 3.",price:900000}
+        ].map(b => {
+          const post = gameState.posts.find(p => p.id === b.id);
+          const unlocked = post && post.unlocked !== false;
+          const canAfford = gameState.money >= b.price && (b.id !== "post_4" || gameState.posts.find(p => p.id === "post_3")?.unlocked !== false);
+          return '<article class="expansion-card ' + (unlocked ? "is-unlocked" : "") + '">' +
+            '<div class="expansion-copy"><strong>' + b.title + '</strong><span>' + b.desc + '</span><small>' + (unlocked ? "✓ Бокс работает" : "Разовая инвестиция · без ежедневной аренды") + '</small></div>' +
+            (unlocked ? '<span class="expansion-status">ОТКРЫТ</span>' : '<button class="game-btn primary" data-unlock-post="' + b.id + '" ' + (canAfford ? "" : "disabled") + '>Открыть · ' + fmt(b.price) + '</button>') +
+            '</article>';
+        }).join("")}
+      </div>
+
+      <div class="panel-section">
+        <h3>Техническое обслуживание</h3>
+        <p style="color:#94a3b8;font-size:12px;">После каждой мойки оборудование изнашивается. Профилактика стоит 12 000 ₽ и восстанавливает 35 пунктов ресурса. Изношенные боксы чаще ломаются.</p>
+        ${gameState.posts.filter(post => post.unlocked !== false).map((post, index) => {
+          const condition = Math.max(0, Math.min(100, Math.round(Number.isFinite(post.maintenance) ? post.maintenance : 100)));
+          const color = condition < 35 ? '#fb7185' : condition < 65 ? '#fbbf24' : '#4ade9b';
+          const label = post.broken ? 'Неисправен · нужен ремонт' : post.busy ? 'Сейчас обслуживает автомобиль' : condition < 35 ? 'Критический износ' : condition < 65 ? 'Нужна профилактика' : 'Рабочее состояние';
+          const canService = !post.broken && !post.busy && condition < 100 && gameState.money >= 12000;
+          return '<article class="expansion-card">' +
+            '<div class="expansion-copy"><strong>Бокс ' + (index + 1) + ' · ' + label + '</strong>' +
+            '<div style="height:7px;background:#172538;border-radius:8px;overflow:hidden;margin:8px 0;"><div style="height:100%;width:' + condition + '%;background:' + color + ';border-radius:8px;"></div></div>' +
+            '<small>Ресурс оборудования: ' + condition + '%</small></div>' +
+            (post.broken ? '<span class="expansion-status">РЕМОНТ</span>' : '<button class="game-btn primary" data-service-post="' + post.id + '" ' + (canService ? '' : 'disabled') + '>Профилактика · 12 000 ₽</button>') +
+            '</article>';
+        }).join('')}
+      </div>
+
+      <div class="panel-section">
+        <h3>Сеть филиалов</h3>
+        <p style="color:#94a3b8;font-size:12px;">Филиалы работают автономно. В конце смены они обслуживают клиентов и оплачивают аренду, коммунальные расходы и материалы. Управляющий повышает пропускную способность, его зарплата 5 000 ₽/день.</p>
+        ${gameState.branches.map(b => {
+          const loc = BALANCE.locations[b.locationId];
+          return '<article class="expansion-card"><div class="expansion-copy"><strong>' + b.name + '</strong><span>' + (b.manager || 'Управляющий не назначен') + ' · ' + b.bays + ' бокса</span><small>Машин: ' + b.totalCars + ' · химия: ' + b.suppliesStock + ' · прибыль за смену: ' + fmt(b.lastDayProfit) + '</small><small>Выручка: ' + fmt(b.totalRevenue) + ' · расходы: ' + fmt(b.totalExpenses) + ' · аренда: ' + fmt(loc.dailyRent) + '/день</small><input data-branch-manager="' + b.id + '" value="' + b.manager.replace(/"/g, '&quot;') + '" maxlength="40" placeholder="Имя управляющего" style="width:100%;margin-top:8px;background:#0b1a2b;color:#e7f5ff;border:1px solid #31516b;border-radius:9px;padding:9px;"><button class="game-btn" data-save-branch-manager="' + b.id + '" style="margin-top:6px;">Назначить управляющего</button></div></article>';
+        }).join('') || '<p style="color:#94a3b8;font-size:12px;">Дополнительных филиалов пока нет.</p>'}
+        ${Object.values(BALANCE.locations).filter(loc => !gameState.branches.some(b => b.locationId === loc.id)).map(loc => '<article class="expansion-card"><div class="expansion-copy"><strong>' + loc.name + '</strong><span>' + loc.description + '</span><small>2 бокса · стартовый склад 100 комплектов</small></div><button class="game-btn primary" data-open-branch="' + loc.id + '" ' + (gameState.competitorAcquired && gameState.money >= BALANCE.branch.purchasePrice && gameState.branches.length < BALANCE.branch.maxBranches ? '' : 'disabled') + '>Открыть · ' + fmt(BALANCE.branch.purchasePrice) + '</button></article>').join('')}
+        <small style="color:#94a3b8;">До 3 дополнительных точек. Открытие доступно после выкупа активов «КлинАвто».</small>
+      </div>
+
+      <div class="panel-section">
         <h3>Документы и проверки надзора</h3>
         <p style="color:#94a3b8;font-size:11px;margin-bottom:8px;">
           Отсутствие документов грозит крупными штрафами во время инспекций СЭС, пожарного надзора и экологии.
         </p>
         ${docsHtml}
+      </div>
+
+      <div class="panel-section">
+        <h3>Склад автохимии</h3>
+        <div class="business-health-grid">
+          <div><span>Комплектов на складе</span><strong>${gameState.suppliesStock}</strong></div>
+          <div><span>Партия поставки</span><strong>50 шт.</strong></div>
+        </div>
+        <p style="color:#94a3b8;font-size:12px;">Один комплект расходуется на завершённую мойку. Следи за остатком, чтобы боксы не простаивали.</p>
+        <button class="game-btn primary" id="btn-buy-supplies" style="width:100%;" ${gameState.money < 25000 ? "disabled" : ""}>Заказать 50 комплектов · 25 000 ₽</button>
       </div>
 
       <div class="panel-section">
@@ -145,6 +244,37 @@ export function showBusinessPanel() {
     if (e.target === panel) panel.remove();
   });
 
+  // Дополнительные услуги для клиентов
+  panel.querySelectorAll('[data-extra-service]').forEach(input => {
+    input.addEventListener('change', () => {
+      const result = gameState.toggleExtraService(input.dataset.extraService, input.checked);
+      if (result.success) {
+        audioManager.play('buttonClick');
+        panel.remove();
+        showBusinessPanel();
+      } else {
+        audioManager.play('error');
+        showToast(result.reason, 'warning');
+      }
+    });
+  });
+
+  // Профилактика оборудования
+  panel.querySelectorAll('[data-service-post]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const result = gameState.servicePost(btn.dataset.servicePost);
+      if (result.success) {
+        audioManager.play('wrenchRepair');
+        showToast('Профилактика завершена · ресурс оборудования восстановлен', 'success');
+        panel.remove();
+        showBusinessPanel();
+      } else {
+        audioManager.play('error');
+        showToast(result.reason, 'warning');
+      }
+    });
+  });
+
   // Оформление документов
   panel.querySelectorAll('[data-buy-doc]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -161,6 +291,35 @@ export function showBusinessPanel() {
       }
     });
   });
+
+  // Unlock additional wash bays.
+  panel.querySelectorAll('[data-unlock-post]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const result = gameState.unlockPost(btn.dataset.unlockPost);
+      if (result.success) {
+        audioManager.play('cashRegister');
+        showToast('Новый бокс открыт! Теперь можно обслуживать больше клиентов.', 'success');
+        panel.remove();
+        showBusinessPanel();
+      } else {
+        audioManager.play('error');
+        showToast(result.reason, 'warning');
+      }
+    });
+  });
+
+
+  panel.querySelectorAll('[data-open-branch]').forEach(btn => btn.addEventListener('click', () => {
+    const result = gameState.openBranch(btn.dataset.openBranch);
+    if (result.success) { showToast('Филиал открыт: ' + result.branch.name, 'success'); panel.remove(); showBusinessPanel(); }
+    else showToast(result.reason, 'warning');
+  }));
+  panel.querySelectorAll('[data-save-branch-manager]').forEach(btn => btn.addEventListener('click', () => {
+    const input = panel.querySelector('[data-branch-manager="' + btn.dataset.saveBranchManager + '"]');
+    const result = gameState.assignBranchManager(btn.dataset.saveBranchManager, input?.value);
+    if (result.success) { showToast('Управляющий назначен · 5 000 ₽/день', 'success'); panel.remove(); showBusinessPanel(); }
+    else showToast(result.reason, 'warning');
+  }));
 
   // Цена
   document.getElementById('price-down').addEventListener('click', () => {
@@ -212,6 +371,23 @@ export function showBusinessPanel() {
     });
   }
 
+  // Закупка материалов для склада.
+  const suppliesBtn = document.getElementById('btn-buy-supplies');
+  if (suppliesBtn) {
+    suppliesBtn.addEventListener('click', () => {
+      const result = gameState.buySuppliesStock();
+      if (result.success) {
+        audioManager.play('success');
+        showToast('Склад пополнен: 50 комплектов', 'success');
+        panel.remove();
+        showBusinessPanel();
+      } else {
+        audioManager.play('error');
+        showToast(result.reason, 'warning');
+      }
+    });
+  }
+
   // Найм
   const hireBtn = document.getElementById('btn-hire');
   if (hireBtn) {
@@ -228,6 +404,39 @@ export function showBusinessPanel() {
       }
     });
   }
+
+  // Специализация сотрудников
+  panel.querySelectorAll('[data-employee-role]').forEach(select => {
+    select.addEventListener('change', () => {
+      const result = gameState.setEmployeeRole(select.dataset.employeeRole, select.value);
+      if (result.success) {
+        audioManager.play('buttonClick');
+        const labels = { generalist: 'Универсал', washer: 'Мойщик', mechanic: 'Техник' };
+        showToast(`${result.employee.name}: роль - ${labels[select.value]}`, 'success');
+      } else {
+        audioManager.play('error');
+        showToast(result.reason, 'warning');
+        panel.remove();
+        showBusinessPanel();
+      }
+    });
+  });
+
+  // Обучение сотрудников
+  panel.querySelectorAll('[data-train-emp]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const result = gameState.trainEmployee(btn.dataset.trainEmp, btn.dataset.skill);
+      if (result.success) {
+        audioManager.play('success');
+        showToast(`${result.employee.name}: навык улучшен`, 'success');
+        panel.remove();
+        showBusinessPanel();
+      } else {
+        audioManager.play('error');
+        showToast(result.reason, 'warning');
+      }
+    });
+  });
 
   // Увольнение
   panel.querySelectorAll('[data-fire-emp]').forEach(btn => {
