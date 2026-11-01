@@ -53,6 +53,7 @@ export default class CarWashScene extends Phaser.Scene {
       if (object !== this.player && Number(object.depth || 0) < 12) object.setVisible(false);
     }
     this._createPlayer();
+    this.player.setVisible(false);
     this._setupControls();
 
     this._carSprites = {};
@@ -1850,6 +1851,7 @@ export default class CarWashScene extends Phaser.Scene {
     const shadow = this.add.ellipse(sprite.x + 3, sprite.y + 9, 72, 27, 0x02050b, 0.36)
       .setScale(0.44).setDepth(sprite.depth - 0.02);
     this._carSprites[car.id] = sprite;
+    sprite.setVisible(false);
     this._carShadows[car.id] = shadow;
 
     this.tweens.add({
@@ -2413,6 +2415,7 @@ export default class CarWashScene extends Phaser.Scene {
 
     this._updateCameraTracking(false);
     this._updateDepth();
+    this._threeEnvironment?.syncActors(this.player, this._carSprites);
     this._updateActionBtnContext();
     this._updateTargetHighlight(time);
     this._updateSprayEffect(time);
