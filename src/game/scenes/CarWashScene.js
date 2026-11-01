@@ -69,6 +69,11 @@ export default class CarWashScene extends Phaser.Scene {
     this._walkFrame = 0;
     this._dayCycleUpdateTimer = 0;
     this._createDayCycleEffects();
+    // The new Three.js world owns the environment lighting; legacy full-screen
+    // day overlays would tint the entire 3D render (especially at sunrise).
+    this._dayAtmosphere?.setVisible(false);
+    this._dayTint?.setVisible(false);
+    this._dayLights?.setVisible(false);
 
     // Графический маркер подсветки целевой машины во время обучения
     this._targetHighlight = this.add.graphics();
@@ -309,6 +314,8 @@ export default class CarWashScene extends Phaser.Scene {
     // group so the rival reads as a place, not a HUD sticker or floating sign.
     const group = this.add.container(0, 0).setDepth(2.2);
     this._competitorGroup = group;
+    // Rival architecture is now part of the 3D world; keep the old flat proxy hidden.
+    group.setVisible(false);
     const g = this.add.graphics();
     group.add(g);
 
@@ -816,7 +823,7 @@ export default class CarWashScene extends Phaser.Scene {
     this._dayTint.setFillStyle(profile.tintColor, profile.tintAlpha);
     const atmosphereAlpha = clock.hour < 9 ? 0.13 : clock.hour < 10 ? 0.075 : clock.hour >= 19 ? 0.045 : clock.hour >= 17.5 ? 0.055 : 0.018;
     this._dayAtmosphere.setFillStyle(profile.tintColor, atmosphereAlpha);
-    this.cameras.main.setBackgroundColor(profile.tintColor);
+    this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
 
     const lights = this._dayLights;
     lights.clear();
