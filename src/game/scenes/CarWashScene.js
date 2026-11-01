@@ -1852,6 +1852,7 @@ export default class CarWashScene extends Phaser.Scene {
       .setScale(0.44).setDepth(sprite.depth - 0.02);
     this._carSprites[car.id] = sprite;
     sprite.setVisible(false);
+    shadow.setVisible(false);
     this._carShadows[car.id] = shadow;
 
     this.tweens.add({
