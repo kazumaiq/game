@@ -50,6 +50,8 @@ export class ThreeWashEnvironment {
     this.camera.position.set(450, 1500, 800);
     this.camera.lookAt(450, 0, 410);
 
+    this.carActors = new Map();
+    this.workerActor = null;
     this._buildLighting();
     this._buildGround();
     this._buildMainBuilding();
@@ -238,6 +240,132 @@ export class ThreeWashEnvironment {
       this._box(x, 300, -1, 48, 48, 22, 0x3d4a55, 0.82, 0.05);
       this._add(new THREE.SphereGeometry(27, 18, 14), mat(0x2e9667, 0.9), x, 39, 300);
       this._add(new THREE.SphereGeometry(18, 16, 12), mat(0x3bb77b, 0.88), x - 12, 48, 310);
+    }
+  }
+
+  _createCarActor(id, sprite) {
+    const group = new THREE.Group();
+    const colorMap = {
+      sedan: 0x2775c8, hatchback: 0x27a58a, suv: 0x7c8796,
+      coupe: 0xc44f69, van: 0xd2d7dc, luxury: 0x202a36,
+    };
+    const className = String(sprite.texture?.key || '').replace(/^car_/, '').replace(/_(dirty|foam|rinse)$/, '');
+    const paint = colorMap[className] || 0x2879bd;
+    const bodyMat = mat(paint, 0.24, 0.42);
+    const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x17384d, roughness: 0.12, metalness: 0.28, clearcoat: 1 });
+    const rubber = mat(0x111820, 0.92, 0.02);
+    const metal = mat(0x9aa9b4, 0.28, 0.8);
+    const light = new THREE.MeshStandardMaterial({ color: 0xfff0bd, emissive: 0xffd27a, emissiveIntensity: 0.7 });
+    const rear = new THREE.MeshStandardMaterial({ color: 0xff3e52, emissive: 0xb20e25, emissiveIntensity: 0.6 });
+    const addBox = (w, h, d, material, x, y, z) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      group.add(mesh);
+      return mesh;
+    };
+    // Low-poly sculpted body, separate cabin, glazing, bumpers and wheel arches.
+    addBox(68, 8, 29, bodyMat, 0, 7, 0);
+    addBox(57, 4, 27, bodyMat, 0, 11, 0);
+    addBox(37, 8, 21, glassMat, -1, 15, 0);
+    addBox(15, 7, 20, bodyMat, 18, 14, 0);
+    addBox(3, 3, 31, metal, -33, 6, 0);
+    addBox(3, 3, 31, metal, 33, 6, 0);
+    for (const x of [-22, 22]) for (const z of [-15, 15]) {
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 4, 12), rubber);
+      wheel.rotation.z = Math.PI / 2;
+      wheel.position.set(x, 5, z);
+      group.add(wheel);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 4.3, 10), metal);
+      hub.rotation.z = Math.PI / 2;
+      hub.position.copy(wheel.position);
+      group.add(hub);
+    }
+    for (const z of [-9, 9]) {
+      addBox(3, 2, 5, light, 34, 8, z);
+      addBox(3, 2, 5, rear, -34, 8, z);
+    }
+    const shadow = new THREE.Mesh(
+      new THREE.CircleGeometry(38, 28),
+      new THREE.MeshBasicMaterial({ color: 0x02060b, transparent: true, opacity: 0.34, depthWrite: false })
+    );
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.scale.set(1.12, 0.48, 1);
+    shadow.position.set(0, 0.2, 0);
+    group.add(shadow);
+    this.world.add(group);
+    this.carActors.set(id, { group, bodyMat, className, shadow });
+    return this.carActors.get(id);
+  }
+
+  _createWorkerActor() {
+    const group = new THREE.Group();
+    const uniform = mat(0x176f9a, 0.58, 0.12);
+    const trim = mat(0x5de0e8, 0.35, 0.25);
+    const skin = mat(0xf0c4a1, 0.8, 0);
+    const dark = mat(0x17232d, 0.8, 0.02);
+    const add = (geometry, material, x, y, z) => {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      group.add(mesh);
+      return mesh;
+    };
+    add(new THREE.CapsuleGeometry(6, 13, 4, 8), uniform, 0, 17, 0);
+    add(new THREE.SphereGeometry(5.5, 12, 10), skin, 0, 29, 0);
+    add(new THREE.BoxGeometry(13, 2, 8), trim, 0, 23, 0);
+    add(new THREE.BoxGeometry(3, 2, 8), dark, 0, 34, 0);
+    for (const side of [-1, 1]) {
+      add(new THREE.CapsuleGeometry(2, 9, 3, 6), uniform, side * 8, 17, 0);
+      add(new THREE.CapsuleGeometry(2.3, 8, 3, 6), dark, side * 3, 5, 0);
+    }
+    const shadow = new THREE.Mesh(
+      new THREE.CircleGeometry(12, 20),
+      new THREE.MeshBasicMaterial({ color: 0x02060b, transparent: true, opacity: 0.28, depthWrite: false })
+    );
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.scale.set(1.2, 0.6, 1);
+    shadow.position.y = 0.15;
+    group.add(shadow);
+    this.world.add(group);
+    this.workerActor = group;
+  }
+
+  syncActors(player, carSprites) {
+    if (this.disposed) return;
+    if (!this.workerActor) this._createWorkerActor();
+    if (player?.active) {
+      this.workerActor.visible = player.visible !== false;
+      this.workerActor.position.set(player.x, 0, player.y);
+      const vx = player.body?.velocity?.x || 0;
+      const vy = player.body?.velocity?.y || 0;
+      if (Math.abs(vx) + Math.abs(vy) > 1) this.workerActor.rotation.y = Math.atan2(vx, -vy);
+    }
+    const active = new Set();
+    for (const [id, sprite] of Object.entries(carSprites || {})) {
+      if (!sprite?.active) continue;
+      active.add(id);
+      const actor = this.carActors.get(id) || this._createCarActor(id, sprite);
+      actor.group.visible = sprite.visible !== false && sprite.alpha > 0.01;
+      actor.group.position.set(sprite.x, 0, sprite.y);
+      actor.group.rotation.y = -sprite.rotation;
+      actor.group.scale.setScalar(Math.max(0.35, sprite.scaleX || 1));
+      const textureKey = String(sprite.texture?.key || '');
+      const clean = !/(dirty|foam)/.test(textureKey);
+      actor.bodyMat.color.setHex(clean ? 0x3e9bc8 : 0x63584c);
+      actor.bodyMat.roughness = clean ? 0.2 : 0.78;
+    }
+    for (const [id, actor] of this.carActors) {
+      if (!active.has(id)) {
+        this.world.remove(actor.group);
+        actor.group.traverse((obj) => {
+          obj.geometry?.dispose?.();
+          if (obj.material && obj.material !== actor.bodyMat) obj.material.dispose?.();
+        });
+        actor.bodyMat.dispose();
+        this.carActors.delete(id);
+      }
     }
   }
 
