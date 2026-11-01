@@ -2416,7 +2416,15 @@ export default class CarWashScene extends Phaser.Scene {
 
     this._updateCameraTracking(false);
     this._updateDepth();
-    this._threeEnvironment?.syncActors(this.player, this._carSprites);
+    const activeWashCar = this._isWashing && this._washingCar ? gameState.getCar(this._washingCar) : null;
+    this._threeEnvironment?.syncActors(this.player, this._carSprites, activeWashCar ? {
+      active: true,
+      carId: activeWashCar.id,
+      progress: activeWashCar.washProgress,
+      stage: BALANCE.services.expressWash.stages[activeWashCar.washStage] || 'foam',
+      stageIndex: activeWashCar.washStage,
+      stageCount: BALANCE.services.expressWash.stages.length,
+    } : null);
     this._updateActionBtnContext();
     this._updateTargetHighlight(time);
     this._updateSprayEffect(time);

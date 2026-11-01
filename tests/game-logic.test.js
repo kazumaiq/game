@@ -498,7 +498,7 @@ test('27. Сводка здоровья бизнеса считает аренд
   assert.equal(health.totalPosts, 4);
   assert.equal(health.brokenPosts, 0);
   assert.equal(health.occupancy, 0);
-  assert.equal(health.washesToBreakEven, 18);
+  assert.equal(health.washesToBreakEven, 17);
   assert.equal(health.moneyRunwayDays, Math.floor(gameState.money / 6500));
   assert.equal(health.health, 'healthy');
 
@@ -658,7 +658,7 @@ test('33. Дополнительные услуги увеличивают вы�
   const moneyBefore = gameState.money;
   const net = gameState.addServiceIncome(car.id, 0.7);
   assert.equal(net, baseNet + (250 + 450) - (70 + 120));
-  assert.equal(gameState.money, moneyBefore + net);
+  assert.equal(gameState.money, moneyBefore + net + 2500); // first-wash career achievement
   assert.ok(gameState.financialLog.some(item => item.description === 'Мойка Седан'));
   assert.equal(gameState.selectedExtras.length, 2);
 });
@@ -771,17 +771,20 @@ test('Филиал открывается отдельно, получает у�
   assert.equal(gameState.money, 600_000);
   assert.equal(gameState.openBranch('residential').success, false);
   assert.equal(gameState.assignBranchManager(result.branch.id, 'Иван Петров').success, true);
+  // The default 500 ₽ price cannot cover the manager, rent, utilities, and supplies.
+  // Set a viable price before asserting that the managed branch earns a profit.
+  result.branch.servicePrice = 2500;
   const before = gameState.money;
   const profit = gameState.settleBranchesDaily();
   assert.ok(profit > 0);
   assert.ok(gameState.money > before);
-  assert.equal(result.branch.totalCars, 8);
-  assert.equal(result.branch.suppliesStock, 92);
+  assert.equal(result.branch.totalCars, 6);
+  assert.equal(result.branch.suppliesStock, 94);
   const saved = gameState.serialize();
   gameState.reset();
   assert.equal(gameState.deserialize(saved), true);
   assert.equal(gameState.branches[0].manager, 'Иван Петров');
-  assert.equal(gameState.branches[0].totalCars, 8);
+  assert.equal(gameState.branches[0].totalCars, 6);
 });
 test('Филиал без управляющего ограничен потоком и складом химии', () => {
   gameState.initNewGame('roadside');

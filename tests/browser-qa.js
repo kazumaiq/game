@@ -124,7 +124,10 @@ async function runBrowserQA() {
   try {
     // ШАГ 1: Загрузка страницы
     console.log(`3. Открытие ${serverUrl}...`);
-    await page.goto(serverUrl, { waitUntil: 'networkidle0' });
+    // Phaser/Three.js keep rendering activity alive; networkidle0 can remain
+    // pending even after the app is usable. Wait for the document, then check UI.
+    await page.goto(serverUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    await page.waitForSelector('#game-container canvas', { timeout: 15000 });
     await new Promise((r) => setTimeout(r, 1000));
 
     // Скриншот 1: Главное меню

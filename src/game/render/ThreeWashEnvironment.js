@@ -52,6 +52,10 @@ export class ThreeWashEnvironment {
 
     this.carActors = new Map();
     this.workerActor = null;
+    this.washTime = 0;
+    this.washingCarId = null;
+    this.washBrushes = [];
+    this.carPaintColor = new THREE.Color();
     this._buildLighting();
     this._buildGround();
     this._buildMainBuilding();
@@ -193,11 +197,25 @@ export class ThreeWashEnvironment {
       this._box(x, z + 4, 157, 238, 3, 2, 0x40d9f1, 0.2, 0.5, { castShadow: false });
 
       for (const side of [-1, 1]) {
-        const brush = this._add(new THREE.CylinderGeometry(13, 13, 82, 20),
-          mat(0x35a7c9, 0.48, 0.32), x + side * 91, 65, z - 10);
-        brush.rotation.z = Math.PI / 2;
-        this._add(new THREE.TorusGeometry(13, 2.2, 8, 24),
-          mat(0xc4e8f0, 0.28, 0.72), x + side * 91, 65, z - 10);
+        const brush = new THREE.Group();
+        brush.position.set(x + side * 91, 65, z - 10);
+        const core = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, 82, 16), mat(0x183b4c, 0.62, 0.24));
+        core.rotation.z = Math.PI / 2;
+        brush.add(core);
+        for (let segment = -3; segment <= 3; segment++) {
+          const tuft = new THREE.Mesh(new THREE.BoxGeometry(11, 2.4, 2.4), mat(segment % 2 ? 0x56c8df : 0x35a7c9, 0.48, 0.22));
+          tuft.position.x = segment * 11;
+          for (let spoke = 0; spoke < 8; spoke++) {
+            const fin = new THREE.Mesh(new THREE.BoxGeometry(9.5, 8, 2), tuft.material);
+            fin.position.x = segment * 11;
+            fin.rotation.x = spoke * Math.PI / 4;
+            brush.add(fin);
+          }
+          brush.add(tuft);
+        }
+        brush.traverse((part) => { part.castShadow = true; part.receiveShadow = true; });
+        this.world.add(brush);
+        this.washBrushes.push(brush);
       }
 
       this._box(x, z - 3, 139, 176, 8, 5, 0x344c5d, 0.36, 0.65);
@@ -251,7 +269,7 @@ export class ThreeWashEnvironment {
     };
     const className = String(sprite.texture?.key || '').replace(/^car_/, '').replace(/_(dirty|foam|rinse)$/, '');
     const paint = colorMap[className] || 0x2879bd;
-    const bodyMat = mat(paint, 0.24, 0.42);
+    const bodyMat = new THREE.MeshPhysicalMaterial({ color: paint, roughness: 0.24, metalness: 0.42, clearcoat: 0.82, clearcoatRoughness: 0.16 });
     const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x17384d, roughness: 0.12, metalness: 0.28, clearcoat: 1 });
     const rubber = mat(0x111820, 0.92, 0.02);
     const metal = mat(0x9aa9b4, 0.28, 0.8);
@@ -332,8 +350,10 @@ export class ThreeWashEnvironment {
     this.workerActor = group;
   }
 
-  syncActors(player, carSprites) {
+  syncActors(player, carSprites, washState = null) {
     if (this.disposed) return;
+    this.washTime += 1 / this.maxFps;
+    this.washingCarId = washState?.active ? String(washState.carId) : null;
     if (!this.workerActor) this._createWorkerActor();
     if (player?.active) {
       this.workerActor.visible = player.active !== false;
@@ -353,9 +373,28 @@ export class ThreeWashEnvironment {
       actor.group.scale.setScalar(Math.max(0.35, sprite.scaleX || 1));
       const textureKey = String(sprite.texture?.key || '');
       const clean = !/(dirty|foam)/.test(textureKey);
-      actor.bodyMat.color.setHex(clean ? 0x3e9bc8 : 0x63584c);
-      actor.bodyMat.roughness = clean ? 0.2 : 0.78;
+      const washing = String(id) === this.washingCarId;
+      const progress = washing
+        ? THREE.MathUtils.clamp(((Number(washState.stageIndex) || 0) + THREE.MathUtils.clamp(Number(washState.progress) / 100, 0, 1)) / Math.max(1, Number(washState.stageCount) || 1), 0, 1)
+        : (clean ? 1 : 0);
+      const dirty = 1 - progress;
+      actor.bodyMat.color.setHex(0x3e9bc8).lerp(this.carPaintColor.setHex(0x75624e), dirty * (washing ? 0.72 : 0.86));
+      actor.bodyMat.roughness = THREE.MathUtils.lerp(0.2, 0.74, dirty);
+      actor.bodyMat.clearcoat = THREE.MathUtils.lerp(0.82, 0.12, dirty);
+      if (washing) {
+        if (!actor.foam) {
+          actor.foam = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshBasicMaterial({ color: 0xe9fbff, transparent: true, opacity: 0.64, depthWrite: false }));
+          actor.foam.scale.set(27, 4, 11);
+          actor.foam.position.set(0, 18, 0);
+          actor.group.add(actor.foam);
+        }
+        const foaming = washState.stage === 'foam';
+        actor.foam.visible = foaming;
+        actor.foam.material.opacity = 0.42 + Math.sin(this.washTime * 5) * 0.08;
+        actor.foam.scale.x = 24 + progress * 8;
+      } else if (actor.foam) actor.foam.visible = false;
     }
+    for (const brush of this.washBrushes) brush.rotation.x += 0.045;
     for (const [id, actor] of this.carActors) {
       if (!active.has(id)) {
         this.world.remove(actor.group);
