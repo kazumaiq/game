@@ -47,6 +47,7 @@ export default class CarWashScene extends Phaser.Scene {
 
     this._createEnvironment();
     this._threeEnvironment = new ThreeWashEnvironment(this);
+    this._threeEnvironment.setRivalStatus(gameState.competitorActive, gameState.competitorClosed);
     // Keep the established Phaser gameplay sprites and controls, but replace
     // the old flat yard artwork with the new real-time 3D environment.
     for (const object of this.children.list) {
@@ -151,6 +152,7 @@ export default class CarWashScene extends Phaser.Scene {
       updateHUD();
       this._updateUpgradeVisuals();
       this._createCompetitorVisuals();
+      this._threeEnvironment?.setRivalStatus(gameState.competitorActive, gameState.competitorClosed);
     };
     gameState.on('stateChanged', this._onStateChanged);
     this._createCompetitorVisuals();
@@ -821,6 +823,7 @@ export default class CarWashScene extends Phaser.Scene {
     if (!this._dayTint || !this._dayLights) return;
     const clock = getShiftClock(gameState.shiftTimeRemaining, BALANCE.time);
     const profile = getDayCycleProfile(clock.hour);
+    this._threeEnvironment?.setDayLighting(profile, clock.hour);
     this._dayTint.setFillStyle(profile.tintColor, profile.tintAlpha);
     const atmosphereAlpha = clock.hour < 9 ? 0.13 : clock.hour < 10 ? 0.075 : clock.hour >= 19 ? 0.045 : clock.hour >= 17.5 ? 0.055 : 0.018;
     this._dayAtmosphere.setFillStyle(profile.tintColor, atmosphereAlpha);

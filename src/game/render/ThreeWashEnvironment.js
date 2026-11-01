@@ -7,6 +7,29 @@ function mat(color, roughness = 0.72, metalness = 0) {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness });
 }
 
+function createAsphaltTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 256;
+  const context = canvas.getContext('2d');
+  const pixels = context.createImageData(256, 256);
+  let seed = 918273;
+  for (let i = 0; i < pixels.data.length; i += 4) {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    const grain = 36 + ((seed >>> 24) % 38);
+    pixels.data[i] = grain;
+    pixels.data[i + 1] = grain + 4;
+    pixels.data[i + 2] = grain + 9;
+    pixels.data[i + 3] = 255;
+  }
+  context.putImageData(pixels, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(7, 7);
+  texture.anisotropy = 4;
+  return texture;
+}
+
 export class ThreeWashEnvironment {
   constructor(scene) {
     this.gameScene = scene;
@@ -19,7 +42,10 @@ export class ThreeWashEnvironment {
     this.host.insertBefore(this.canvas, document.getElementById('game-container'));
 
     const mobile = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 768;
-    this.maxFps = mobile ? 30 : 60;
+    const requestedQuality = new URLSearchParams(window.location.search).get('quality');
+    const lowQuality = requestedQuality === 'low' || (mobile && (navigator.deviceMemory || 4) <= 3);
+    this.quality = lowQuality ? 'mobile-low' : (mobile ? 'mobile-high' : 'desktop-high');
+    this.maxFps = lowQuality ? 24 : (mobile ? 30 : 60);
     this.lastFrame = 0;
     this.disposed = false;
     this.renderer = new THREE.WebGLRenderer({
@@ -30,9 +56,9 @@ export class ThreeWashEnvironment {
       stencil: false,
       depth: true,
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, mobile ? 1 : 1.5));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lowQuality ? 0.85 : (mobile ? 1.15 : 1.5)));
     this.renderer.setClearColor(0x000000, 0);
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.enabled = !lowQuality;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.15;
@@ -71,12 +97,14 @@ export class ThreeWashEnvironment {
   }
 
   _buildLighting() {
-    this.world.add(new THREE.HemisphereLight(0xd5edff, 0x26313b, 2.15));
+    this.hemisphere = new THREE.HemisphereLight(0xd5edff, 0x26313b, 2.15);
+    this.world.add(this.hemisphere);
 
     const sun = new THREE.DirectionalLight(0xffe3c4, 3.25);
+    this.sun = sun;
     sun.position.set(-340, 1050, 520);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.mapSize.set(this.quality === 'desktop-high' ? 1024 : 512, this.quality === 'desktop-high' ? 1024 : 512);
     sun.shadow.camera.left = -620;
     sun.shadow.camera.right = 620;
     sun.shadow.camera.top = 720;
@@ -85,12 +113,16 @@ export class ThreeWashEnvironment {
     this.world.add(sun);
 
     const cyan = new THREE.PointLight(0x35cfff, 78, 520, 2);
+    this.bayLights = [];
+    this.bayLights.push(cyan);
     cyan.position.set(300, 190, 510);
     this.world.add(cyan);
     const pink = new THREE.PointLight(0xff4f91, 38, 420, 2);
+    this.bayLights.push(pink);
     pink.position.set(610, 150, 510);
     this.world.add(pink);
     const warm = new THREE.PointLight(0xffb36b, 46, 430, 2);
+    this.bayLights.push(warm);
     warm.position.set(450, 170, 690);
     this.world.add(warm);
   }
@@ -124,6 +156,26 @@ export class ThreeWashEnvironment {
         color: 0x303b46, roughness: 0.27, metalness: 0.18,
         clearcoat: 0.72, clearcoatRoughness: 0.2,
       }), { castShadow: false });
+
+    const road = this._groundPlane(450, 585, 1100, 210, -7.4,
+      new THREE.MeshStandardMaterial({ map: createAsphaltTexture(), color: 0x9ca9b3, roughness: 0.78, metalness: 0.08 }),
+      { castShadow: false });
+    road.material.map.repeat.set(12, 3);
+
+    // Painted lane dividers, crosswalk and parking bays are raised slightly to avoid z-fighting.
+    for (let x = -80; x < 980; x += 58) {
+      this._box(x, 584, -6.8, 30, 1.3, 0.3, 0xd7dfe2, 0.72, 0, { castShadow: false });
+    }
+    for (let i = 0; i < 9; i++) {
+      this._box(286 + i * 35, 533, -6.7, 3, 28, 0.35, 0xc7d0d5, 0.7, 0, { castShadow: false });
+      this._box(614 + i * 35, 533, -6.7, 3, 28, 0.35, 0xc7d0d5, 0.7, 0, { castShadow: false });
+    }
+    for (const x of [185, 715]) {
+      for (let bay = 0; bay < 3; bay++) {
+        const px = x + (bay - 1) * 42;
+        this._box(px, 375, -6.6, 1.2, 62, 0.25, 0xc4d0d5, 0.75, 0, { castShadow: false });
+      }
+    }
 
     // Subtle concrete panels, curb, drains and real reflective puddles.
     for (let i = 0; i < 18; i++) {
@@ -171,6 +223,7 @@ export class ThreeWashEnvironment {
     }
     this._box(450, 754, 18, 250, 5, 28, 0x0c1520, 0.45, 0.3);
     this._box(450, 750, 47, 235, 2, 2, 0xffb36b, 0.2, 0.4, { castShadow: false });
+    this._addSign('CITY WASH', 450, 145, 630, 0x2ac7ec);
   }
 
   _buildWashBays() {
@@ -242,6 +295,64 @@ export class ThreeWashEnvironment {
     }
     this._box(450, 238, 96, 260, 3, 24, 0x0b1520, 0.5, 0.3);
     this._box(450, 236, 120, 250, 2, 2, 0xff9a50, 0.2, 0.4, { castShadow: false });
+    this._addSign('КЛИНАВТО', 450, 134, 232, 0xffa05a);
+    this.rivalInteriorLights = [];
+    for (const x of [250, 450, 650]) {
+      const light = new THREE.PointLight(0xffa45e, 7, 130, 2);
+      light.position.set(x, 36, 184);
+      this.world.add(light);
+      this.rivalInteriorLights.push(light);
+    }
+    // Add a covered customer entrance and a raised office wing to break up the flat roofline.
+    this._box(450, 115, 78, 362, 9, 7, 0x708391, 0.42, 0.5);
+    this._box(450, 112, 85, 348, 4, 2, 0x64d4e8, 0.24, 0.48, { castShadow: false });
+    this._box(820, 170, 16, 92, 150, 96, 0x344958, 0.64, 0.22);
+    this._box(820, 170, 114, 104, 158, 10, 0x182a38, 0.46, 0.3);
+    for (const z of [125, 168, 211]) {
+      this._box(820, z, 35, 72, 2.5, 48, 0x4d7788, 0.2, 0.3, { castShadow: false });
+    }
+  }
+
+  _addSign(label, x, y, z, accent) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#101c28';
+    context.beginPath();
+    context.roundRect(4, 4, 504, 120, 18);
+    context.fill();
+    context.strokeStyle = `#${accent.toString(16).padStart(6, '0')}`;
+    context.lineWidth = 7;
+    context.stroke();
+    context.fillStyle = '#f0f6fa';
+    context.font = '800 54px Arial, sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(label, 256, 67, 470);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, toneMapped: false });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(150, 37.5), material);
+    mesh.position.set(x, y, z);
+    this.world.add(mesh);
+  }
+
+  setDayLighting(profile, hour) {
+    if (!profile || !this.sun) return;
+    const daylight = THREE.MathUtils.smoothstep(hour, 6.5, 10) * (1 - THREE.MathUtils.smoothstep(hour, 17, 20.5));
+    const sunlight = 1.05 + daylight * 2.15;
+    this.sun.intensity = sunlight;
+    this.sun.color.setHex(profile.tintColor ?? 0xffffff);
+    this.hemisphere.intensity = 1.05 + daylight * 1.2;
+    for (const light of this.bayLights) light.intensity = 8 + (profile.lampAlpha || 0) * 70;
+    const rivalMultiplier = this.rivalOpen && !this.rivalClosed ? 1 : 0.08;
+    for (const light of this.rivalInteriorLights || []) light.intensity = (2 + (profile.lampAlpha || 0) * 14) * rivalMultiplier;
+  }
+
+  setRivalStatus(active, closed) {
+    this.rivalOpen = Boolean(active);
+    this.rivalClosed = Boolean(closed);
   }
 
   _buildStreetFurniture() {
@@ -256,8 +367,24 @@ export class ThreeWashEnvironment {
     }
     for (const x of [170, 730]) {
       this._box(x, 300, -1, 48, 48, 22, 0x3d4a55, 0.82, 0.05);
-      this._add(new THREE.SphereGeometry(27, 18, 14), mat(0x2e9667, 0.9), x, 39, 300);
-      this._add(new THREE.SphereGeometry(18, 16, 12), mat(0x3bb77b, 0.88), x - 12, 48, 310);
+      this._add(new THREE.CylinderGeometry(3.2, 4.6, 33, 7), mat(0x67503b, 0.94), x, 31, 300, { castShadow: false });
+      this._add(new THREE.ConeGeometry(22, 34, 7), mat(0x23664b, 0.91), x, 58, 300);
+      this._add(new THREE.ConeGeometry(16, 28, 7), mat(0x32805b, 0.9), x, 77, 300);
+      this._add(new THREE.ConeGeometry(10, 22, 7), mat(0x4a9b6c, 0.88), x, 92, 300);
+    }
+    // Sculpted street corner blocks create a readable city horizon around the lot.
+    for (const [x, z, w, d, h, color] of [
+      [45, 210, 78, 100, 118, 0x354a59], [845, 205, 88, 106, 146, 0x3c505d],
+      [80, 755, 120, 70, 68, 0x405361], [820, 754, 132, 72, 86, 0x344958],
+    ]) {
+      this._box(x, z, -1, w, d, h, color, 0.76, 0.12);
+      for (let level = 0; level < Math.floor(h / 28); level++) {
+        for (const side of [-1, 1]) {
+          this._box(x + side * w * 0.25, z + d / 2 + 0.8, 12 + level * 27, w * 0.18, 1.2, 13,
+            level % 2 ? 0x73a9b8 : 0x617f8d, 0.3, 0.22, { castShadow: false });
+        }
+      }
+      this._box(x, z, h - 1, w + 5, d + 5, 3, 0x263847, 0.6, 0.22);
     }
   }
 
