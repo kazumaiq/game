@@ -264,17 +264,27 @@ export class ThreeWashEnvironment {
   _createCarActor(id, sprite) {
     const group = new THREE.Group();
     const colorMap = {
-      sedan: 0x2775c8, hatchback: 0x27a58a, suv: 0x7c8796,
-      coupe: 0xc44f69, van: 0xd2d7dc, luxury: 0x202a36,
+      sedan: 0x2775c8, compact: 0x27a58a, suv: 0x7c8796,
+      wagon: 0xc44f69, van: 0xd2d7dc, premium: 0x202a36,
     };
     const className = String(sprite.texture?.key || '').replace(/^car_/, '').replace(/_(dirty|foam|rinse)$/, '');
     const paint = colorMap[className] || 0x2879bd;
+    const profiles = {
+      compact: { length: 60, width: 29, cabin: 33, cabinY: 14, wheelbase: 39, roof: 17 },
+      sedan: { length: 70, width: 30, cabin: 39, cabinY: 15, wheelbase: 46, roof: 18 },
+      suv: { length: 70, width: 34, cabin: 38, cabinY: 18, wheelbase: 44, roof: 22 },
+      wagon: { length: 73, width: 30, cabin: 47, cabinY: 15, wheelbase: 47, roof: 18 },
+      van: { length: 72, width: 34, cabin: 49, cabinY: 17, wheelbase: 43, roof: 23 },
+      premium: { length: 74, width: 32, cabin: 42, cabinY: 15, wheelbase: 49, roof: 19 },
+    };
+    const shape = profiles[className] || profiles.sedan;
     const bodyMat = new THREE.MeshPhysicalMaterial({ color: paint, roughness: 0.24, metalness: 0.42, clearcoat: 0.82, clearcoatRoughness: 0.16 });
     const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x17384d, roughness: 0.12, metalness: 0.28, clearcoat: 1 });
     const rubber = mat(0x111820, 0.92, 0.02);
     const metal = mat(0x9aa9b4, 0.28, 0.8);
     const light = new THREE.MeshStandardMaterial({ color: 0xfff0bd, emissive: 0xffd27a, emissiveIntensity: 0.7 });
     const rear = new THREE.MeshStandardMaterial({ color: 0xff3e52, emissive: 0xb20e25, emissiveIntensity: 0.6 });
+    const wheels = [];
     const addBox = (w, h, d, material, x, y, z) => {
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
       mesh.position.set(x, y, z);
@@ -283,37 +293,52 @@ export class ThreeWashEnvironment {
       group.add(mesh);
       return mesh;
     };
-    // Low-poly sculpted body, separate cabin, glazing, bumpers and wheel arches.
-    addBox(68, 8, 29, bodyMat, 0, 7, 0);
-    addBox(57, 4, 27, bodyMat, 0, 11, 0);
-    addBox(37, 8, 21, glassMat, -1, 15, 0);
-    addBox(15, 7, 20, bodyMat, 18, 14, 0);
-    addBox(3, 3, 31, metal, -33, 6, 0);
-    addBox(3, 3, 31, metal, 33, 6, 0);
-    for (const x of [-22, 22]) for (const z of [-15, 15]) {
-      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 4, 12), rubber);
-      wheel.rotation.z = Math.PI / 2;
-      wheel.position.set(x, 5, z);
+    // Distinct body, cabin and glazing proportions keep each customer class readable.
+    const halfLength = shape.length / 2;
+    addBox(shape.length, 8, shape.width, bodyMat, 0, 7, 0);
+    addBox(shape.length * 0.82, 4, shape.width * 0.92, bodyMat, 0, 11, 0);
+    const cabinFront = shape.cabin * 0.12;
+    const cabinRear = -shape.cabin * 0.22;
+    addBox(shape.cabin, shape.roof - 8, shape.width * 0.72, glassMat, (cabinFront + cabinRear) / 2, shape.cabinY, 0);
+    addBox(shape.cabin * 0.62, 2.2, shape.width * 0.75, bodyMat, (cabinFront + cabinRear) / 2, shape.cabinY + (shape.roof - 8) / 2, 0);
+    addBox(4, 2.5, shape.width + 2, metal, -halfLength + 1, 6, 0);
+    addBox(4, 2.5, shape.width + 2, metal, halfLength - 1, 6, 0);
+    for (const x of [-shape.wheelbase / 2, shape.wheelbase / 2]) for (const z of [-shape.width * 0.51, shape.width * 0.51]) {
+      const wheel = new THREE.Group();
+      wheel.position.set(x, 5.5, z);
       group.add(wheel);
-      const hub = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 4.3, 10), metal);
+      const tire = new THREE.Mesh(new THREE.CylinderGeometry(6.2, 6.2, 4.5, 16), rubber);
+      tire.rotation.z = Math.PI / 2;
+      wheel.add(tire);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(3.7, 3.7, 4.8, 12), metal);
       hub.rotation.z = Math.PI / 2;
-      hub.position.copy(wheel.position);
-      group.add(hub);
+      wheel.add(hub);
+      for (let spoke = 0; spoke < 5; spoke++) {
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(0.8, 5.2, 0.7), metal);
+        bar.position.y = 0;
+        bar.rotation.x = spoke * Math.PI * 2 / 5;
+        hub.add(bar);
+      }
+      wheels.push(wheel);
     }
-    for (const z of [-9, 9]) {
-      addBox(3, 2, 5, light, 34, 8, z);
-      addBox(3, 2, 5, rear, -34, 8, z);
+    for (const z of [-shape.width * 0.43, shape.width * 0.43]) {
+      addBox(3, 2.4, 5, light, halfLength - 2, 8, z);
+      addBox(3, 2.6, 5, rear, -halfLength + 2, 8, z);
+      addBox(5, 3.6, 4, bodyMat, 4, 10.2, z * 1.08); // side mirror
+      addBox(shape.cabin * 0.48, 1.5, 1.1, metal, -2, 12, z * 1.02); // door handle
     }
+    // Hood and grille details face the positive-X front of the car.
+    addBox(2, 4, shape.width * 0.34, mat(0x1a2731, 0.48, 0.28), halfLength - 0.8, 7, 0);
     const shadow = new THREE.Mesh(
       new THREE.CircleGeometry(38, 28),
       new THREE.MeshBasicMaterial({ color: 0x02060b, transparent: true, opacity: 0.34, depthWrite: false })
     );
     shadow.rotation.x = -Math.PI / 2;
-    shadow.scale.set(1.12, 0.48, 1);
+    shadow.scale.set(shape.length / 34, shape.width / 31, 1);
     shadow.position.set(0, 0.2, 0);
     group.add(shadow);
     this.world.add(group);
-    this.carActors.set(id, { group, bodyMat, className, shadow });
+    this.carActors.set(id, { group, bodyMat, className, shadow, wheels, lastX: sprite.x, lastY: sprite.y });
     return this.carActors.get(id);
   }
 
@@ -323,6 +348,7 @@ export class ThreeWashEnvironment {
     const trim = mat(0x5de0e8, 0.35, 0.25);
     const skin = mat(0xf0c4a1, 0.8, 0);
     const dark = mat(0x17232d, 0.8, 0.02);
+    const limbs = [];
     const add = (geometry, material, x, y, z) => {
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.set(x, y, z);
@@ -335,8 +361,12 @@ export class ThreeWashEnvironment {
     add(new THREE.BoxGeometry(13, 2, 8), trim, 0, 23, 0);
     add(new THREE.BoxGeometry(3, 2, 8), dark, 0, 34, 0);
     for (const side of [-1, 1]) {
-      add(new THREE.CapsuleGeometry(2, 9, 3, 6), uniform, side * 8, 17, 0);
-      add(new THREE.CapsuleGeometry(2.3, 8, 3, 6), dark, side * 3, 5, 0);
+      const arm = add(new THREE.CapsuleGeometry(2, 9, 3, 6), uniform, side * 8, 17, 0);
+      const leg = add(new THREE.CapsuleGeometry(2.3, 8, 3, 6), dark, side * 3, 5, 0);
+      arm.geometry.translate(0, -4, 0);
+      leg.geometry.translate(0, -4, 0);
+      arm.position.set(side * 6, 20, 0);
+      limbs.push({ arm, leg, side });
     }
     const shadow = new THREE.Mesh(
       new THREE.CircleGeometry(12, 20),
@@ -348,6 +378,7 @@ export class ThreeWashEnvironment {
     group.add(shadow);
     this.world.add(group);
     this.workerActor = group;
+    this.workerLimbs = limbs;
   }
 
   syncActors(player, carSprites, washState = null) {
@@ -360,7 +391,13 @@ export class ThreeWashEnvironment {
       this.workerActor.position.set(player.x, 0, player.y);
       const vx = player.body?.velocity?.x || 0;
       const vy = player.body?.velocity?.y || 0;
-      if (Math.abs(vx) + Math.abs(vy) > 1) this.workerActor.rotation.y = Math.atan2(vx, -vy);
+      const speed = Math.hypot(vx, vy);
+      if (speed > 1) this.workerActor.rotation.y = Math.atan2(vx, -vy);
+      const gait = speed > 1 ? Math.sin(this.washTime * 10) * Math.min(0.65, speed / 120) : (washState?.active ? Math.sin(this.washTime * 7) * 0.22 : 0);
+      for (const { arm, leg, side } of this.workerLimbs || []) {
+        arm.rotation.z = gait * side;
+        leg.rotation.z = -gait * side;
+      }
     }
     const active = new Set();
     for (const [id, sprite] of Object.entries(carSprites || {})) {
@@ -371,6 +408,10 @@ export class ThreeWashEnvironment {
       actor.group.position.set(sprite.x, 0, sprite.y);
       actor.group.rotation.y = -sprite.rotation;
       actor.group.scale.setScalar(Math.max(0.35, sprite.scaleX || 1));
+      const travel = Math.hypot(sprite.x - actor.lastX, sprite.y - actor.lastY);
+      if (travel > 0.01) for (const wheel of actor.wheels) wheel.rotation.x += travel / 6.2;
+      actor.lastX = sprite.x;
+      actor.lastY = sprite.y;
       const textureKey = String(sprite.texture?.key || '');
       const clean = !/(dirty|foam)/.test(textureKey);
       const washing = String(id) === this.washingCarId;
