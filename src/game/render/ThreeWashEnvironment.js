@@ -336,7 +336,7 @@ export class ThreeWashEnvironment {
     if (this.disposed) return;
     if (!this.workerActor) this._createWorkerActor();
     if (player?.active) {
-      this.workerActor.visible = player.visible !== false;
+      this.workerActor.visible = player.active !== false;
       this.workerActor.position.set(player.x, 0, player.y);
       const vx = player.body?.velocity?.x || 0;
       const vy = player.body?.velocity?.y || 0;
@@ -347,7 +347,7 @@ export class ThreeWashEnvironment {
       if (!sprite?.active) continue;
       active.add(id);
       const actor = this.carActors.get(id) || this._createCarActor(id, sprite);
-      actor.group.visible = sprite.visible !== false && sprite.alpha > 0.01;
+      actor.group.visible = sprite.active !== false && sprite.alpha > 0.01;
       actor.group.position.set(sprite.x, 0, sprite.y);
       actor.group.rotation.y = -sprite.rotation;
       actor.group.scale.setScalar(Math.max(0.35, sprite.scaleX || 1));
